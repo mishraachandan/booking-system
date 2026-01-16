@@ -29,38 +29,46 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class User {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
-    private Long id;  // PRIMARY KEY
-    
+    private Long id; // PRIMARY KEY
+
     @Column(nullable = false, unique = true)
     private String email;
-    
+
     @Column(nullable = false, name = "password_hash")
     private String passwordHash;
-    
+
     @Column(name = "first_name")
     private String firstName;
-    
+
     @Column(name = "last_name")
     private String lastName;
-    
+
     private String phone;
-    
+
     @Enumerated(EnumType.STRING)
+    @Builder.Default
     private UserRole role = UserRole.USER;
-    
-    private boolean enabled = true;
-    
+
+    @Builder.Default
+    private boolean enabled = false;
+
+    private String otp;
+
+    @Column(name = "otp_expiry")
+    private LocalDateTime otpExpiry;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
-    
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-    
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
