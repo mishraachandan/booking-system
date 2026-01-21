@@ -7,5 +7,7 @@ public enum ResourceType {
     COURT,
     STUDIO,
     LAB,
+    MOVIE,
+    EVENT,
     OTHER
 }
