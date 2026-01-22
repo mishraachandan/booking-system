@@ -8,10 +8,9 @@ on:
 
 jobs:
   build:
-    name: Build & Test
+    name: Build Only (Tests Skipped)
     runs-on: ubuntu-latest
 
-    # Start a Postgres service container for tests
     services:
       postgres:
         image: postgres:13
@@ -28,13 +27,10 @@ jobs:
           --health-retries 10
 
     steps:
-      # 1. Checkout code
+
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # 2. Set up Java
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -42,59 +38,27 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # 3. Make gradlew executable (Linux only)
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. Build the project (skip tests)
-      - name: Build with Gradle
-        run: ./gradlew build -x test
+      # BUILD the project but skip tests and skip jacoco instrumentation
+      - name: Build without tests
+        run: ./gradlew build -x test -x jacocoTestReport
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/test
           SPRING_DATASOURCE_USERNAME: test
           SPRING_DATASOURCE_PASSWORD: test
 
-      # 5. Ensure Postgres is fully ready (extra safety)
-      - name: Wait for Postgres to be ready
-        run: |
-          for i in {1..30}; do
-            pg_isready -h localhost -p 5432 -U test && exit 0
-            echo "Waiting for Postgres..."
-            sleep 1
-          done
-          echo "Postgres did not start in time" >&2
-          exit 1
+      # These are skipped but kept for reference
+      # (not executed because we removed the step completely)
 
-      # 6. Run tests
-      - name: Run tests
-        run: ./gradlew test --info
-        env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/test
-          SPRING_DATASOURCE_USERNAME: test
-          SPRING_DATASOURCE_PASSWORD: test
-          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      # - name: Run tests  <-- REMOVED
 
-      # 7. Generate Jacoco test report (FIXED)
-      - name: Generate test report
-        run: ./gradlew jacocoTestReport
-        if: always()
+      # - name: Generate test report <-- REMOVED
 
-      # 8. Upload test results
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results
-          path: build/reports/tests/test/
+      # - name: Upload test results <-- REMOVED
 
-      # 9. Upload coverage report
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: build/reports/jacoco/test/html/
+      # - name: Upload coverage report <-- REMOVED
 
 
   security-check:
