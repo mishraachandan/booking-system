@@ -3,6 +3,9 @@ package com.mishraachandan.booking_system.dto.entity;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -28,6 +31,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 public class User {
 
     @Id
@@ -39,6 +43,7 @@ public class User {
     private String email;
 
     @Column(nullable = false, name = "password_hash")
+    @JsonIgnore
     private String passwordHash;
 
     @Column(name = "first_name")
@@ -56,13 +61,16 @@ public class User {
     @Builder.Default
     private boolean enabled = false;
 
+    @JsonIgnore
     private String otp;
 
     @Column(name = "otp_expiry")
+    @JsonIgnore
     private LocalDateTime otpExpiry;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @Builder.Default
+    @JsonIgnore
     private List<Booking> bookings = new ArrayList<>();
 
     @CreationTimestamp

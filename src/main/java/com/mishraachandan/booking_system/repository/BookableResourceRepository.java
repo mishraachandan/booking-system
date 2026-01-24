@@ -11,5 +11,7 @@ import java.util.List;
 public interface BookableResourceRepository extends JpaRepository<BookableResource, Long> {
     List<BookableResource> findByCategory(Category category);
 
+    java.util.Optional<BookableResource> findByName(String name);
+
     boolean existsByName(String name);
 }
