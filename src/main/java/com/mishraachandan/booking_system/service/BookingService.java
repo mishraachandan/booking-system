@@ -2,23 +2,25 @@ package com.mishraachandan.booking_system.service;
 
 import com.mishraachandan.booking_system.dto.entity.Booking;
 import com.mishraachandan.booking_system.dto.entity.BookableResource;
-import com.mishraachandan.booking_system.dto.entity.Seat;
+import com.mishraachandan.booking_system.dto.entity.Show;
+import com.mishraachandan.booking_system.dto.entity.ShowSeat;
 import com.mishraachandan.booking_system.dto.entity.SeatStatus;
 import com.mishraachandan.booking_system.dto.status.BookingStatus;
 import com.mishraachandan.booking_system.dto.entity.User;
 import com.mishraachandan.booking_system.dto.pojo.BookingRequest;
-import com.mishraachandan.booking_system.dto.pojo.SeatBookingRequest;
+import com.mishraachandan.booking_system.dto.pojo.ShowSeatBookingRequest;
 import com.mishraachandan.booking_system.repository.BookableResourceRepository;
 import com.mishraachandan.booking_system.repository.BookingRepository;
-import com.mishraachandan.booking_system.repository.SeatRepository;
+import com.mishraachandan.booking_system.repository.ShowRepository;
+import com.mishraachandan.booking_system.repository.ShowSeatRepository;
 import com.mishraachandan.booking_system.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -29,37 +31,36 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final BookableResourceRepository resourceRepository;
     private final UserRepository userRepository;
-    private final SeatRepository seatRepository;
+    private final ShowRepository showRepository;
+    private final ShowSeatRepository showSeatRepository;
 
     public BookingService(BookingRepository bookingRepository,
             BookableResourceRepository resourceRepository,
             UserRepository userRepository,
-            SeatRepository seatRepository) {
+            ShowRepository showRepository,
+            ShowSeatRepository showSeatRepository) {
         this.bookingRepository = bookingRepository;
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
-        this.seatRepository = seatRepository;
+        this.showRepository = showRepository;
+        this.showSeatRepository = showSeatRepository;
     }
 
     /**
-     * Place a new booking for a user.
+     * Place a new generic booking for a user (Event-based, non-seated).
      */
     @Transactional
     public Booking placeBooking(Long userId, BookingRequest request) {
-        // Fetch user
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 
-        // Fetch resource
         BookableResource resource = resourceRepository.findById(request.getResourceId())
                 .orElseThrow(() -> new IllegalArgumentException("Resource not found: " + request.getResourceId()));
 
-        // Check if event has already started
         if (resource.getStartTime() != null && resource.getStartTime().isBefore(LocalDateTime.now())) {
             throw new IllegalStateException("Cannot book: Event has already started");
         }
 
-        // Capacity check: Count existing bookings for this resource
         List<Booking> existingBookings = bookingRepository.findByResourceId(request.getResourceId());
         int currentBookedTickets = existingBookings.stream()
                 .filter(b -> b.getStatus() == BookingStatus.CONFIRMED)
@@ -74,7 +75,6 @@ public class BookingService {
                     "Not enough capacity. Available: " + (totalCapacity - currentBookedTickets));
         }
 
-        // Create booking
         Booking booking = Booking.builder()
                 .user(user)
                 .resource(resource)
@@ -93,64 +93,85 @@ public class BookingService {
     }
 
     /**
-     * Book specific seats for a user.
+     * Book specific ShowSeats for a show.
+     * Validates that seats are locked by the requesting user, marks them BOOKED,
+     * and creates a booking in AWAITING_PAYMENT status.
      */
     @Transactional
-    public Booking bookSeats(Long userId, SeatBookingRequest request) {
-        // Fetch user
+    public Booking bookShowSeats(Long userId, ShowSeatBookingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 
-        // Fetch resource
-        BookableResource resource = resourceRepository.findById(request.getResourceId())
-                .orElseThrow(() -> new IllegalArgumentException("Resource not found: " + request.getResourceId()));
+        Show show = showRepository.findById(request.getShowId())
+                .orElseThrow(() -> new IllegalArgumentException("Show not found: " + request.getShowId()));
 
-        // Check if event has already started
-        if (resource.getStartTime() != null && resource.getStartTime().isBefore(LocalDateTime.now())) {
-            throw new IllegalStateException("Cannot book: Event has already started");
+        if (show.getStartTime().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Cannot book: Show has already started");
         }
 
-        // Validate and lock all requested seats
-        List<Seat> seatsToBook = new ArrayList<>();
-        for (String seatNumber : request.getSeatNumbers()) {
-            Seat seat = seatRepository.findByResourceIdAndSeatNumber(request.getResourceId(), seatNumber)
-                    .orElseThrow(() -> new IllegalArgumentException("Seat not found: " + seatNumber));
+        List<ShowSeat> showSeats = showSeatRepository.findAllById(request.getShowSeatIds());
+        if (showSeats.size() != request.getShowSeatIds().size()) {
+            throw new IllegalArgumentException("Some ShowSeat IDs were not found");
+        }
 
-            if (seat.getStatus() == SeatStatus.BOOKED) {
-                throw new IllegalStateException("Seat " + seatNumber + " is already booked");
+        // Validate each seat: must be LOCKED by this user
+        BigDecimal totalPrice = BigDecimal.ZERO;
+        for (ShowSeat ss : showSeats) {
+            if (ss.getStatus() == SeatStatus.BOOKED) {
+                throw new IllegalStateException("Seat " + ss.getSeat().getSeatNumber() + " is already booked");
             }
-
-            if (seat.getStatus() == SeatStatus.LOCKED && !userId.equals(seat.getLockedByUserId())) {
-                throw new IllegalStateException("Seat " + seatNumber + " is locked by another user");
+            if (ss.getStatus() == SeatStatus.LOCKED && !userId.equals(ss.getLockedByUserId())) {
+                throw new IllegalStateException("Seat " + ss.getSeat().getSeatNumber() + " is locked by another user");
             }
-
-            seatsToBook.add(seat);
+            if (ss.getStatus() == SeatStatus.AVAILABLE) {
+                throw new IllegalStateException(
+                        "Seat " + ss.getSeat().getSeatNumber() + " must be locked before booking. Please lock it first.");
+            }
+            totalPrice = totalPrice.add(ss.getPrice());
         }
 
-        // Mark all seats as BOOKED
-        for (Seat seat : seatsToBook) {
-            seat.setStatus(SeatStatus.BOOKED);
-            seat.setLockedAt(null);
-            seat.setLockedByUserId(null);
-            seatRepository.save(seat);
+        // Mark all ShowSeats as BOOKED
+        for (ShowSeat ss : showSeats) {
+            ss.setStatus(SeatStatus.BOOKED);
+            ss.setLockedAt(null);
+            ss.setLockedByUserId(null);
         }
+        showSeatRepository.saveAll(showSeats);
 
-        // Create booking
+        // Create booking in AWAITING_PAYMENT status
         Booking booking = Booking.builder()
                 .user(user)
-                .resource(resource)
-                .numberOfTickets(seatsToBook.size())
+                .show(show)
+                .numberOfTickets(showSeats.size())
                 .notes(request.getNotes())
-                .status(BookingStatus.CONFIRMED)
-                .startTime(resource.getStartTime())
-                .endTime(resource.getEndTime())
+                .status(BookingStatus.AWAITING_PAYMENT)
+                .startTime(show.getStartTime())
+                .endTime(show.getEndTime())
                 .build();
 
         Booking savedBooking = bookingRepository.save(booking);
-        logger.info("Booking {} created for user {} with {} seats on resource {}",
-                savedBooking.getId(), userId, seatsToBook.size(), request.getResourceId());
+        logger.info("Booking {} created for user {} with {} seats on show {} (total: ₹{}). Status: AWAITING_PAYMENT",
+                savedBooking.getId(), userId, showSeats.size(), request.getShowId(), totalPrice);
 
         return savedBooking;
+    }
+
+    /**
+     * Confirm a booking after payment is successful.
+     */
+    @Transactional
+    public Booking confirmBooking(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
+
+        if (booking.getStatus() != BookingStatus.AWAITING_PAYMENT) {
+            throw new IllegalStateException("Booking is not in AWAITING_PAYMENT status");
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+        Booking confirmed = bookingRepository.save(booking);
+        logger.info("Booking {} confirmed", bookingId);
+        return confirmed;
     }
 
     /**

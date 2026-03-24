@@ -51,28 +51,12 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         private void populateSeatsForAllResources() {
-                List<BookableResource> resources = resourceRepository.findAll();
-                for (BookableResource resource : resources) {
-                        if (seatRepository.findByResourceId(resource.getId()).isEmpty()) {
-                                generateSeatsForResource(resource);
-                        }
-                }
+                // Disabled temporarily during Phase 1 domain migration
+                // Will be re-enabled when migrating to Show/Screen architecture
         }
 
         private void generateSeatsForResource(BookableResource resource) {
-                char row = 'A';
-                // Generate a 10x10 grid (A1 to J10) = 100 seats
-                for (int i = 0; i < 10; i++) {
-                        for (int j = 1; j <= 10; j++) {
-                                Seat seat = Seat.builder()
-                                                .resource(resource)
-                                                .seatNumber("" + (char) (row + i) + j)
-                                                .status(SeatStatus.AVAILABLE)
-                                                .build();
-                                seatRepository.save(seat);
-                        }
-                }
-                System.out.println("Generated 100 seats (A1-J10) for resource: " + resource.getName());
+                // Disabled temporarily during Phase 1 domain migration
         }
 
         private Category createCategoryIfNotExists(String name, String description) {
@@ -122,8 +106,7 @@ public class DataInitializer implements CommandLineRunner {
                 });
 
                 // Ensure seats are generated for this resource
-                if (seatRepository.findByResourceId(resource.getId()).isEmpty()) {
-                        generateSeatsForResource(resource);
-                }
+                // Disabled temporarily during Phase 1 domain migration
+
         }
 }
