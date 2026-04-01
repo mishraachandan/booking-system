@@ -60,12 +60,18 @@ public class Booking {
             "createdAt", "updatedAt" })
     private User user;
 
-    // FOREIGN KEY to BookableResource
+    // FOREIGN KEY to BookableResource (for generic event bookings)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "resource_id", nullable = false)
+    @JoinColumn(name = "resource_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "bookings", "category", "createdAt", "updatedAt",
             "description" })
     private BookableResource resource;
+
+    // FOREIGN KEY to Show (for cinema/show-based bookings)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "show_id")
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    private Show show;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

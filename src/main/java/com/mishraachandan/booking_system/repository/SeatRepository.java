@@ -15,22 +15,7 @@ import java.util.Optional;
 @Repository
 public interface SeatRepository extends JpaRepository<Seat, Long> {
 
-    List<Seat> findByResourceIdAndStatus(Long resourceId, SeatStatus status);
+    List<Seat> findByScreenId(Long screenId);
 
-    Optional<Seat> findByResourceIdAndSeatNumber(Long resourceId, String seatNumber);
-
-    List<Seat> findByResourceId(Long resourceId);
-
-    /**
-     * Find all seats that have been locked for longer than the specified time.
-     */
-    @Query("SELECT s FROM Seat s WHERE s.status = 'LOCKED' AND s.lockedAt < :cutoffTime")
-    List<Seat> findExpiredLocks(@Param("cutoffTime") LocalDateTime cutoffTime);
-
-    /**
-     * Release expired locks in bulk.
-     */
-    @Modifying
-    @Query("UPDATE Seat s SET s.status = 'AVAILABLE', s.lockedAt = null, s.lockedByUserId = null WHERE s.status = 'LOCKED' AND s.lockedAt < :cutoffTime")
-    int releaseExpiredLocks(@Param("cutoffTime") LocalDateTime cutoffTime);
+    Optional<Seat> findByScreenIdAndSeatNumber(Long screenId, String seatNumber);
 }

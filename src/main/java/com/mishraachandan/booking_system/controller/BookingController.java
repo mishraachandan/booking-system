@@ -2,7 +2,7 @@ package com.mishraachandan.booking_system.controller;
 
 import com.mishraachandan.booking_system.dto.entity.Booking;
 import com.mishraachandan.booking_system.dto.pojo.BookingRequest;
-import com.mishraachandan.booking_system.dto.pojo.SeatBookingRequest;
+import com.mishraachandan.booking_system.dto.pojo.ShowSeatBookingRequest;
 import com.mishraachandan.booking_system.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +21,7 @@ public class BookingController {
     }
 
     /**
-     * Place a new booking.
-     * In production, userId should come from authenticated user context.
+     * Place a new generic booking (non-seated events).
      */
     @PostMapping
     public ResponseEntity<Booking> placeBooking(
@@ -34,14 +33,24 @@ public class BookingController {
     }
 
     /**
-     * Book specific seats for an event.
+     * Book specific ShowSeats for a show.
+     * Seats must be locked first via /api/v1/shows/{showId}/seats/lock.
      */
-    @PostMapping("/seat")
-    public ResponseEntity<Booking> bookSeats(
+    @PostMapping("/show-seats")
+    public ResponseEntity<Booking> bookShowSeats(
             @RequestHeader("X-User-Id") Long userId,
-            @Valid @RequestBody SeatBookingRequest request) {
+            @Valid @RequestBody ShowSeatBookingRequest request) {
 
-        Booking booking = bookingService.bookSeats(userId, request);
+        Booking booking = bookingService.bookShowSeats(userId, request);
+        return ResponseEntity.ok(booking);
+    }
+
+    /**
+     * Confirm a booking after payment.
+     */
+    @PostMapping("/{bookingId}/confirm")
+    public ResponseEntity<Booking> confirmBooking(@PathVariable Long bookingId) {
+        Booking booking = bookingService.confirmBooking(bookingId);
         return ResponseEntity.ok(booking);
     }
 

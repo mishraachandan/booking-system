@@ -32,7 +32,10 @@ public class UserRegistrationRequest {
     private String lastName;
 
     @NotBlank
-    @Pattern(regexp = "^\\d{10}$", message = "Phone number must be 10 digits")
+    @Pattern(
+        regexp = "^[+]?[(]?[0-9]{1,4}[)]?[-\\s./0-9]{7,14}$",
+        message = "Please enter a valid phone number (e.g. +91 9988776655)"
+    )
     private String phone;
 
 }

@@ -34,29 +34,7 @@ public class SeatLockService {
      */
     @Transactional
     public boolean lockSeat(Long resourceId, String seatNumber, Long userId) {
-        Optional<Seat> seatOpt = seatRepository.findByResourceIdAndSeatNumber(resourceId, seatNumber);
-
-        if (seatOpt.isEmpty()) {
-            logger.warn("Seat not found: resourceId={}, seatNumber={}", resourceId, seatNumber);
-            return false;
-        }
-
-        Seat seat = seatOpt.get();
-
-        // Check if seat is available
-        if (seat.getStatus() != SeatStatus.AVAILABLE) {
-            logger.info("Seat {} is not available. Current status: {}", seatNumber, seat.getStatus());
-            return false;
-        }
-
-        // Lock the seat
-        seat.setStatus(SeatStatus.LOCKED);
-        seat.setLockedAt(LocalDateTime.now());
-        seat.setLockedByUserId(userId);
-        seatRepository.save(seat);
-
-        logger.info("Seat {} locked by user {}", seatNumber, userId);
-        return true;
+        throw new UnsupportedOperationException("Undergoing Phase 2 Architecture Migration");
     }
 
     /**
@@ -64,16 +42,7 @@ public class SeatLockService {
      */
     @Transactional
     public void unlockSeat(Long seatId) {
-        Optional<Seat> seatOpt = seatRepository.findById(seatId);
-
-        if (seatOpt.isPresent()) {
-            Seat seat = seatOpt.get();
-            seat.setStatus(SeatStatus.AVAILABLE);
-            seat.setLockedAt(null);
-            seat.setLockedByUserId(null);
-            seatRepository.save(seat);
-            logger.info("Seat {} unlocked", seatId);
-        }
+        throw new UnsupportedOperationException("Undergoing Phase 2 Architecture Migration");
     }
 
     /**
@@ -81,23 +50,14 @@ public class SeatLockService {
      */
     @Transactional
     public void markSeatAsBooked(Long seatId) {
-        Optional<Seat> seatOpt = seatRepository.findById(seatId);
-
-        if (seatOpt.isPresent()) {
-            Seat seat = seatOpt.get();
-            seat.setStatus(SeatStatus.BOOKED);
-            seat.setLockedAt(null);
-            seat.setLockedByUserId(null);
-            seatRepository.save(seat);
-            logger.info("Seat {} marked as booked", seatId);
-        }
+        throw new UnsupportedOperationException("Undergoing Phase 2 Architecture Migration");
     }
 
     /**
      * Get all available seats for a resource.
      */
     public List<Seat> getAvailableSeats(Long resourceId) {
-        return seatRepository.findByResourceIdAndStatus(resourceId, SeatStatus.AVAILABLE);
+        throw new UnsupportedOperationException("Undergoing Phase 2 Architecture Migration");
     }
 
     /**
@@ -107,11 +67,6 @@ public class SeatLockService {
     @Scheduled(fixedRate = 60000) // Every 1 minute
     @Transactional
     public void releaseExpiredLocks() {
-        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(LOCK_TIMEOUT_MINUTES);
-        int releasedCount = seatRepository.releaseExpiredLocks(cutoffTime);
-
-        if (releasedCount > 0) {
-            logger.info("Released {} expired seat locks", releasedCount);
-        }
+        // Disabled temporarily during Phase 2 Architecture Migration
     }
 }
