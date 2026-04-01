@@ -2,6 +2,7 @@ package com.mishraachandan.booking_system.service;
 
 import com.mishraachandan.booking_system.dto.entity.ShowSeat;
 import com.mishraachandan.booking_system.dto.entity.SeatStatus;
+import com.mishraachandan.booking_system.dto.pojo.ShowSeatResponse;
 import com.mishraachandan.booking_system.repository.ShowSeatRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,6 +119,7 @@ public class ShowSeatLockService {
     /**
      * Get all available ShowSeats for a specific show.
      */
+    @Transactional(readOnly = true)
     public List<ShowSeat> getAvailableShowSeats(Long showId) {
         return showSeatRepository.findByShowIdAndStatus(showId, SeatStatus.AVAILABLE);
     }
@@ -125,8 +127,18 @@ public class ShowSeatLockService {
     /**
      * Get all ShowSeats for a specific show (any status).
      */
+    @Transactional(readOnly = true)
     public List<ShowSeat> getAllShowSeats(Long showId) {
         return showSeatRepository.findByShowId(showId);
+    }
+
+    /**
+     * Get all ShowSeats for a show as a flat, serialization-safe DTO list.
+     * Uses a single JOIN query — no Hibernate proxies, no lazy loading issues.
+     */
+    @Transactional(readOnly = true)
+    public List<ShowSeatResponse> getAllShowSeatResponses(Long showId) {
+        return showSeatRepository.findShowSeatResponsesByShowId(showId);
     }
 
     /**

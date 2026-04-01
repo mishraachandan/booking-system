@@ -58,17 +58,17 @@ public class AuthController {
             }
             // If user exists but is not verified, we can re-send OTP
             User user = existingUser.get();
-            String otp = String.format("%06d", new Random().nextInt(999999));
+            String otp = "123456"; // Static OTP for dev environment
             user.setOtp(otp);
             user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
             userRepository.save(user);
-            emailService.sendOtpEmail(user.getEmail(), otp);
+            // emailService.sendOtpEmail(user.getEmail(), otp); // Disabled for dev
             return ResponseEntity
                     .status(200)
                     .body("User already exists but is not verified. A new OTP has been sent to your email.");
         }
 
-        String otp = String.format("%06d", new Random().nextInt(999999));
+        String otp = "123456"; // Static OTP for dev environment
 
         User user = User.builder()
                 .email(userrequest.getEmail())
@@ -85,7 +85,7 @@ public class AuthController {
             if (user != null) {
                 userRepository.save(user);
             }
-            emailService.sendOtpEmail(user.getEmail(), otp);
+            // emailService.sendOtpEmail(user.getEmail(), otp); // Disabled for dev
             return ResponseEntity
                     .status(201) // Created
                     .body("Registration successful. Please verify the OTP sent to your email.");
@@ -125,7 +125,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
         Optional<User> userOptional = userRepository.findByEmail(loginRequest.getEmail());
         if (userOptional.isEmpty()) {
             return ResponseEntity.status(401).body("Invalid email or password");
@@ -133,13 +133,19 @@ public class AuthController {
 
         User user = userOptional.get();
         if (!user.isEnabled()) {
-            return ResponseEntity.status(403).body("Please verify your account first");
+            return ResponseEntity.status(403).body("Please verify your email first. Check your inbox for the OTP.");
         }
 
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
             return ResponseEntity.status(401).body("Invalid email or password");
         }
 
-        return ResponseEntity.ok("Login successful. Welcome " + user.getFirstName() + "!");
+        // Return user info as JSON so frontend can store userId
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("userId", user.getId());
+        response.put("email", user.getEmail());
+        response.put("firstName", user.getFirstName());
+        response.put("message", "Login successful. Welcome " + user.getFirstName() + "!");
+        return ResponseEntity.ok(response);
     }
 }

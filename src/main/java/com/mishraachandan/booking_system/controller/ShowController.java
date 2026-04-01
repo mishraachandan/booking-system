@@ -2,6 +2,7 @@ package com.mishraachandan.booking_system.controller;
 
 import com.mishraachandan.booking_system.dto.entity.Show;
 import com.mishraachandan.booking_system.dto.entity.ShowSeat;
+import com.mishraachandan.booking_system.dto.pojo.ShowSeatResponse;
 import com.mishraachandan.booking_system.service.ShowService;
 import com.mishraachandan.booking_system.service.ShowSeatLockService;
 import lombok.RequiredArgsConstructor;
@@ -36,11 +37,11 @@ public class ShowController {
     }
 
     /**
-     * Get all seats for a show (with their availability status).
+     * Get all seats for a show as a flat DTO (no lazy loading, no circular refs).
      */
     @GetMapping("/{showId}/seats")
-    public ResponseEntity<List<ShowSeat>> getShowSeats(@PathVariable Long showId) {
-        return ResponseEntity.ok(showSeatLockService.getAllShowSeats(showId));
+    public ResponseEntity<List<ShowSeatResponse>> getShowSeats(@PathVariable Long showId) {
+        return ResponseEntity.ok(showSeatLockService.getAllShowSeatResponses(showId));
     }
 
     /**

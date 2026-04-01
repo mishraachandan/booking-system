@@ -6,7 +6,7 @@
     <!-- ======================== -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [traceId=%X{traceId:-none}] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -17,7 +17,7 @@
         <file>logs/booking-system.log</file>
 
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [traceId=%X{traceId:-none}] %-5level %logger{50} - %msg%n</pattern>
         </encoder>
 
         <!-- Roll over daily AND when file exceeds 10 MB -->
