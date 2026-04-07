@@ -276,7 +276,7 @@ export class HomeComponent implements OnInit {
 
   loadShows() {
     this.loading = true;
-    this.showService.getAllShows().subscribe({
+    this.showService.getAllShows(this.selectedCityId).subscribe({
       next: (shows) => {
         this.shows = shows;
         // Extract unique movies from shows
@@ -294,7 +294,8 @@ export class HomeComponent implements OnInit {
   }
 
   onCityChange() {
-    // Filter shows by city if needed — for now reload all
+    this.selectedMovie = null;
+    this.movieShows = [];
     this.loadShows();
   }
 

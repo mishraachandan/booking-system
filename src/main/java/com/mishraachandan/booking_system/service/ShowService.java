@@ -25,6 +25,10 @@ public class ShowService {
         return showRepository.findAll();
     }
 
+    public List<Show> getShowsByCityId(Long cityId) {
+        return showRepository.findByCityId(cityId);
+    }
+
     public Show createShow(Show show) {
         return showRepository.save(show);
     }

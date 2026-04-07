@@ -105,8 +105,8 @@ public class BookingService {
         Show show = showRepository.findById(request.getShowId())
                 .orElseThrow(() -> new IllegalArgumentException("Show not found: " + request.getShowId()));
 
-        if (show.getStartTime().isBefore(LocalDateTime.now())) {
-            throw new IllegalStateException("Cannot book: Show has already started");
+        if (show.getEndTime().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Cannot book: Show has already ended");
         }
 
         List<ShowSeat> showSeats = showSeatRepository.findAllById(request.getShowSeatIds());
@@ -175,7 +175,14 @@ public class BookingService {
     }
 
     /**
-     * Get all bookings for a user.
+     * Get all bookings for a user as flat DTOs (no lazy loading issues).
+     */
+    public List<com.mishraachandan.booking_system.dto.pojo.BookingResponse> getUserBookingsFlat(Long userId) {
+        return bookingRepository.findBookingResponsesByUserId(userId);
+    }
+
+    /**
+     * Get all bookings for a user (entity version — for internal use).
      */
     public List<Booking> getUserBookings(Long userId) {
         return bookingRepository.findByUserId(userId);

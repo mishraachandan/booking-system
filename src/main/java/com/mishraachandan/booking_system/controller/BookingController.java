@@ -2,6 +2,7 @@ package com.mishraachandan.booking_system.controller;
 
 import com.mishraachandan.booking_system.dto.entity.Booking;
 import com.mishraachandan.booking_system.dto.pojo.BookingRequest;
+import com.mishraachandan.booking_system.dto.pojo.BookingResponse;
 import com.mishraachandan.booking_system.dto.pojo.ShowSeatBookingRequest;
 import com.mishraachandan.booking_system.service.BookingService;
 import jakarta.validation.Valid;
@@ -24,12 +25,12 @@ public class BookingController {
      * Place a new generic booking (non-seated events).
      */
     @PostMapping
-    public ResponseEntity<Booking> placeBooking(
+    public ResponseEntity<BookingResponse> placeBooking(
             @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody BookingRequest request) {
 
         Booking booking = bookingService.placeBooking(userId, request);
-        return ResponseEntity.ok(booking);
+        return ResponseEntity.ok(BookingResponse.fromBooking(booking));
     }
 
     /**
@@ -37,29 +38,29 @@ public class BookingController {
      * Seats must be locked first via /api/v1/shows/{showId}/seats/lock.
      */
     @PostMapping("/show-seats")
-    public ResponseEntity<Booking> bookShowSeats(
+    public ResponseEntity<BookingResponse> bookShowSeats(
             @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody ShowSeatBookingRequest request) {
 
         Booking booking = bookingService.bookShowSeats(userId, request);
-        return ResponseEntity.ok(booking);
+        return ResponseEntity.ok(BookingResponse.fromBooking(booking));
     }
 
     /**
      * Confirm a booking after payment.
      */
     @PostMapping("/{bookingId}/confirm")
-    public ResponseEntity<Booking> confirmBooking(@PathVariable Long bookingId) {
+    public ResponseEntity<BookingResponse> confirmBooking(@PathVariable Long bookingId) {
         Booking booking = bookingService.confirmBooking(bookingId);
-        return ResponseEntity.ok(booking);
+        return ResponseEntity.ok(BookingResponse.fromBooking(booking));
     }
 
     /**
-     * Get all bookings for the authenticated user.
+     * Get all bookings for the authenticated user (flat DTO — no lazy loading).
      */
     @GetMapping("/my")
-    public ResponseEntity<List<Booking>> getMyBookings(@RequestHeader("X-User-Id") Long userId) {
-        List<Booking> bookings = bookingService.getUserBookings(userId);
+    public ResponseEntity<List<BookingResponse>> getMyBookings(@RequestHeader("X-User-Id") Long userId) {
+        List<BookingResponse> bookings = bookingService.getUserBookingsFlat(userId);
         return ResponseEntity.ok(bookings);
     }
 

@@ -21,10 +21,13 @@ public class ShowController {
     private final ShowSeatLockService showSeatLockService;
 
     /**
-     * Get all shows.
+     * Get all shows, optionally filtered by city.
      */
     @GetMapping
-    public ResponseEntity<List<Show>> getAllShows() {
+    public ResponseEntity<List<Show>> getAllShows(@RequestParam(required = false) Long cityId) {
+        if (cityId != null && cityId > 0) {
+            return ResponseEntity.ok(showService.getShowsByCityId(cityId));
+        }
         return ResponseEntity.ok(showService.getAllShows());
     }
 

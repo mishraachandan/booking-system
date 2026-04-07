@@ -299,7 +299,7 @@ export class SeatSelectionComponent implements OnInit, OnDestroy {
           this.bookingService.bookShowSeats(this.showId, seatIds).subscribe({
             next: (booking) => {
               this.router.navigate(['/booking/summary'], {
-                queryParams: { bookingId: booking.id, total: this.totalPrice }
+                queryParams: { bookingId: booking.bookingId, total: this.totalPrice }
               });
             },
             error: (err) => {
