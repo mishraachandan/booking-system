@@ -4,11 +4,11 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Simple in-memory, per-key sliding-window rate limiter.
@@ -17,6 +17,15 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * sufficient for protecting authentication endpoints (login, OTP verify) from
  * casual brute-force attacks on a single-instance deployment. For a clustered
  * deployment, swap this out for a distributed limiter (Redis / Bucket4j).
+ *
+ * <p><strong>Memory safety.</strong> Since rate-limit keys can include
+ * attacker-controlled data (e.g. email addresses from the request body), the
+ * backing map must evict stale entries — otherwise an attacker can inflate the
+ * map by sending requests with millions of unique identifiers (a DoS vector).
+ * {@link #tryAcquire(String, int, Duration)} uses
+ * {@link ConcurrentHashMap#compute(Object, java.util.function.BiFunction)} to
+ * atomically prune expired timestamps and drop the map entry when its deque is
+ * empty, which prevents that growth.
  */
 @Component
 public class InMemoryRateLimiter {
@@ -36,9 +45,11 @@ public class InMemoryRateLimiter {
     public boolean tryAcquire(String key, int maxHits, Duration window) {
         Instant now = Instant.now();
         Instant cutoff = now.minus(window);
-        Deque<Instant> deque = hits.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
+        boolean[] allowed = new boolean[]{false};
 
-        synchronized (deque) {
+        hits.compute(key, (k, existing) -> {
+            Deque<Instant> deque = existing == null ? new ArrayDeque<>() : existing;
+
             Iterator<Instant> it = deque.iterator();
             while (it.hasNext()) {
                 if (it.next().isBefore(cutoff)) {
@@ -49,10 +60,22 @@ public class InMemoryRateLimiter {
             }
 
             if (deque.size() >= maxHits) {
-                return false;
+                allowed[0] = false;
+            } else {
+                deque.addLast(now);
+                allowed[0] = true;
             }
-            deque.addLast(now);
-            return true;
-        }
+
+            // Drop the map entry entirely if nothing is tracked any more —
+            // keeps the map bounded even under adversarial key churn.
+            return deque.isEmpty() ? null : deque;
+        });
+
+        return allowed[0];
+    }
+
+    /** Exposed for tests / diagnostics. */
+    int trackedKeyCount() {
+        return hits.size();
     }
 }

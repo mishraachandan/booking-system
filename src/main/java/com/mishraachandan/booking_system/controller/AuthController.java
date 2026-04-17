@@ -82,7 +82,14 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.CREATED)
                         .body("If your details are valid, we have sent a verification code to your email.");
             }
-            // Unverified account — refresh the OTP and re-send.
+            // Unverified account — refresh the OTP as well as any profile fields
+            // the caller supplied this time. Without re-saving the password hash
+            // a user who re-registers with a different password would never be
+            // able to log in after verification (the first hash would persist).
+            user.setPasswordHash(passwordEncoder.encode(userrequest.getPassword()));
+            user.setFirstName(userrequest.getFirstName());
+            user.setLastName(userrequest.getLastName());
+            user.setPhone(userrequest.getPhone());
             user.setOtp(otpHash);
             user.setOtpExpiry(LocalDateTime.now().plus(OTP_TTL));
             userRepository.save(user);
