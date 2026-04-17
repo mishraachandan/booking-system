@@ -75,7 +75,7 @@ jobs:
       # replaces the previous `./gradlew dependencyCheckAnalyze || true` step,
       # which silently no-op'd because the OWASP Gradle plugin wasn't applied.
       - name: Run Trivy vulnerability scanner (filesystem)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           scan-ref: .
