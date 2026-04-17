@@ -31,3 +31,20 @@ spring:
 
 server:
   port: 8080
+
+# Restrict Spring Boot Actuator to a minimal, safe set of endpoints. Even
+# though the project's SecurityFilterChain currently permits all requests,
+# explicitly pinning the exposed endpoints here prevents accidentally
+# shipping /actuator/env, /actuator/beans, /actuator/heapdump, etc.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+  info:
+    env:
+      enabled: false

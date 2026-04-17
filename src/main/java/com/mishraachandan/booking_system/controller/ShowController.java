@@ -2,9 +2,12 @@ package com.mishraachandan.booking_system.controller;
 
 import com.mishraachandan.booking_system.dto.entity.Show;
 import com.mishraachandan.booking_system.dto.entity.ShowSeat;
+import com.mishraachandan.booking_system.dto.pojo.CreateShowRequest;
+import com.mishraachandan.booking_system.dto.pojo.LockSeatsRequest;
 import com.mishraachandan.booking_system.dto.pojo.ShowSeatResponse;
-import com.mishraachandan.booking_system.service.ShowService;
 import com.mishraachandan.booking_system.service.ShowSeatLockService;
+import com.mishraachandan.booking_system.service.ShowService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -59,14 +62,9 @@ public class ShowController {
     public ResponseEntity<Map<String, Object>> lockSeats(
             @PathVariable Long showId,
             @RequestHeader("X-User-Id") Long userId,
-            @RequestBody Map<String, List<Long>> request) {
+            @Valid @RequestBody LockSeatsRequest request) {
 
-        List<Long> showSeatIds = request.get("showSeatIds");
-        if (showSeatIds == null || showSeatIds.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "showSeatIds is required"));
-        }
-
-        boolean success = showSeatLockService.lockShowSeats(showSeatIds, userId);
+        boolean success = showSeatLockService.lockShowSeats(request.getShowSeatIds(), userId);
 
         if (success) {
             return ResponseEntity.ok(Map.of("success", true, "message",
@@ -90,7 +88,7 @@ public class ShowController {
      * Create a new show.
      */
     @PostMapping
-    public ResponseEntity<Show> createShow(@RequestBody Show show) {
-        return ResponseEntity.ok(showService.createShow(show));
+    public ResponseEntity<Show> createShow(@Valid @RequestBody CreateShowRequest request) {
+        return ResponseEntity.ok(showService.createShow(request));
     }
 }
