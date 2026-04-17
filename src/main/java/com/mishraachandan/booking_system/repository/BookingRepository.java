@@ -6,8 +6,10 @@ import org.springframework.data.repository.query.Param;
 import com.mishraachandan.booking_system.dto.entity.Booking;
 import com.mishraachandan.booking_system.dto.pojo.BookingResponse;
 import com.mishraachandan.booking_system.dto.status.BookingStatus;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByUserId(Long userId);
@@ -15,6 +17,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByStartTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
     List<Booking> findByEndTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
     List<Booking> findByStatus(BookingStatus status);
+
+    /** Used by the payment-expiry scheduler */
+    List<Booking> findByStatusAndCreatedAtBefore(BookingStatus status, LocalDateTime before);
+
+    /** Sum the prices of all ShowSeats linked to this booking */
+    @Query("SELECT SUM(ss.price) FROM ShowSeat ss WHERE ss.bookingId = :bookingId")
+    Optional<BigDecimal> findTotalAmountForBooking(@Param("bookingId") Long bookingId);
 
     @Query("""
         SELECT new com.mishraachandan.booking_system.dto.pojo.BookingResponse(

@@ -44,4 +44,11 @@ public class ShowSeat {
 
     @Column(name = "locked_by_user_id")
     private Long lockedByUserId;
+
+    /**
+     * Populated when seats move to BOOKED status.
+     * Used to release seats back to AVAILABLE if payment expires or fails.
+     */
+    @Column(name = "booking_id")
+    private Long bookingId;
 }

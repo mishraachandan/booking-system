@@ -1,5 +1,6 @@
 package com.mishraachandan.booking_system.controller;
 
+import com.mishraachandan.booking_system.config.AuthenticatedUser;
 import com.mishraachandan.booking_system.dto.entity.Booking;
 import com.mishraachandan.booking_system.dto.pojo.BookingRequest;
 import com.mishraachandan.booking_system.dto.pojo.BookingResponse;
@@ -7,6 +8,7 @@ import com.mishraachandan.booking_system.dto.pojo.ShowSeatBookingRequest;
 import com.mishraachandan.booking_system.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,13 +25,14 @@ public class BookingController {
 
     /**
      * Place a new generic booking (non-seated events).
+     * userId is extracted from the JWT via @AuthenticationPrincipal.
      */
     @PostMapping
     public ResponseEntity<BookingResponse> placeBooking(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal AuthenticatedUser principal,
             @Valid @RequestBody BookingRequest request) {
 
-        Booking booking = bookingService.placeBooking(userId, request);
+        Booking booking = bookingService.placeBooking(principal.getUserId(), request);
         return ResponseEntity.ok(BookingResponse.fromBooking(booking));
     }
 
@@ -39,10 +42,10 @@ public class BookingController {
      */
     @PostMapping("/show-seats")
     public ResponseEntity<BookingResponse> bookShowSeats(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal AuthenticatedUser principal,
             @Valid @RequestBody ShowSeatBookingRequest request) {
 
-        Booking booking = bookingService.bookShowSeats(userId, request);
+        Booking booking = bookingService.bookShowSeats(principal.getUserId(), request);
         return ResponseEntity.ok(BookingResponse.fromBooking(booking));
     }
 
@@ -59,8 +62,10 @@ public class BookingController {
      * Get all bookings for the authenticated user (flat DTO — no lazy loading).
      */
     @GetMapping("/my")
-    public ResponseEntity<List<BookingResponse>> getMyBookings(@RequestHeader("X-User-Id") Long userId) {
-        List<BookingResponse> bookings = bookingService.getUserBookingsFlat(userId);
+    public ResponseEntity<List<BookingResponse>> getMyBookings(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+
+        List<BookingResponse> bookings = bookingService.getUserBookingsFlat(principal.getUserId());
         return ResponseEntity.ok(bookings);
     }
 
@@ -70,9 +75,9 @@ public class BookingController {
     @DeleteMapping("/{bookingId}")
     public ResponseEntity<Void> cancelBooking(
             @PathVariable Long bookingId,
-            @RequestHeader("X-User-Id") Long userId) {
+            @AuthenticationPrincipal AuthenticatedUser principal) {
 
-        bookingService.cancelBooking(bookingId, userId);
+        bookingService.cancelBooking(bookingId, principal.getUserId());
         return ResponseEntity.noContent().build();
     }
 }

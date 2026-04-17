@@ -13,7 +13,6 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 @Component
 public class JwtUtil {
@@ -24,10 +23,14 @@ public class JwtUtil {
     private String jwtSecret;
 
     @Value("${jwt.expirationMs}")
-    private int jwtExpirationMs;
+    private long jwtExpirationMs;
+
+    @Value("${jwt.refreshExpirationMs}")
+    private long jwtRefreshExpirationMs;
+
+    // ─── Access Token ────────────────────────────────────────────────────────────
 
     public String generateJwtToken(Authentication authentication, Long userId, String email, String name, String role) {
-
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("email", email);
@@ -38,10 +41,28 @@ public class JwtUtil {
                 .claims(claims)
                 .subject(email)
                 .issuedAt(new Date())
-                .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(key())
                 .compact();
     }
+
+    // ─── Refresh Token ───────────────────────────────────────────────────────────
+
+    public String generateRefreshToken(Long userId, String email) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("type", "refresh");
+
+        return Jwts.builder()
+                .claims(claims)
+                .subject(email)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtRefreshExpirationMs))
+                .signWith(key())
+                .compact();
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────────
 
     private Key key() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
@@ -51,7 +72,7 @@ public class JwtUtil {
         return Jwts.parser().verifyWith((javax.crypto.SecretKey) key()).build()
                 .parseSignedClaims(token).getPayload().getSubject();
     }
-    
+
     public Claims getClaimsFromJwtToken(String token) {
         return Jwts.parser().verifyWith((javax.crypto.SecretKey) key()).build()
                 .parseSignedClaims(token).getPayload();
@@ -70,7 +91,6 @@ public class JwtUtil {
         } catch (IllegalArgumentException e) {
             logger.error("JWT claims string is empty: {}", e.getMessage());
         }
-
         return false;
     }
 }

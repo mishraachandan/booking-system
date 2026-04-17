@@ -29,9 +29,32 @@ spring:
           starttls:
             enable: true
 
+  # ── Keycloak Resource Server ─────────────────────────────────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/booking-system}
+
 server:
   port: 8080
 
 jwt:
   secret: ${JWT_SECRET}
   expirationMs: ${JWT_EXPIRATION_MS}
+  refreshExpirationMs: ${JWT_REFRESH_EXPIRATION_MS}
+
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:RAZORPAY_KEY_NOT_SET}
+  key-secret: ${RAZORPAY_KEY_SECRET:RAZORPAY_SECRET_NOT_SET}
+
+# ── Keycloak Admin & Migration ────────────────────────────────────────────────
+keycloak:
+  admin:
+    server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8180}
+    realm: ${KEYCLOAK_REALM:booking-system}
+    client-id: admin-cli
+    username: ${KEYCLOAK_ADMIN_USER:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+  migration:
+    enabled: ${KEYCLOAK_MIGRATION_ENABLED:true}

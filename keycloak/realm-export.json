@@ -1,0 +1,65 @@
+{
+  "id": "booking-system",
+  "realm": "booking-system",
+  "displayName": "Booking System",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "external",
+  "accessTokenLifespan": 86400,
+  "ssoSessionMaxLifespan": 604800,
+  "roles": {
+    "realm": [
+      { "name": "USER",  "description": "Standard user — can book seats and make payments" },
+      { "name": "ADMIN", "description": "Administrator — can create shows and manage resources" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "booking-frontend",
+      "name": "Booking System Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "http://localhost:4200"
+      ],
+      "webOrigins": [
+        "http://localhost:4200"
+      ],
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["web-origins", "roles", "profile", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    },
+    {
+      "clientId": "booking-backend",
+      "name": "Booking System Backend",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "admin@bookmyshow.dev",
+      "email": "admin@bookmyshow.dev",
+      "firstName": "Super",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Admin@1234", "temporary": false }],
+      "realmRoles": ["ADMIN", "USER"]
+    }
+  ],
+  "defaultDefaultClientScopes": ["web-origins", "roles", "profile", "email"],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self' http://localhost:4200; object-src 'none';"
+  }
+}

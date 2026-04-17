@@ -46,6 +46,14 @@ public class User {
     @JsonIgnore
     private String passwordHash;
 
+    /**
+     * Keycloak user UUID — populated on first Keycloak login or when the user is
+     * created via the Keycloak Admin API during OTP registration.
+     * Null for users not yet migrated to Keycloak.
+     */
+    @Column(name = "keycloak_id", unique = true)
+    private String keycloakId;
+
     @Column(name = "first_name")
     private String firstName;
 

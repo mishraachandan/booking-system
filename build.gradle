@@ -45,10 +45,14 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	// Spring Dotenv - automatically loads .env file
 	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
-	// JWT (JSON Web Tokens)
+	// JWT (JSON Web Tokens) — custom tokens (migration window, kept for API backward-compat)
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+	// Razorpay Payment Gateway
+	implementation 'com.razorpay:razorpay-java:1.4.6'
+	// Keycloak — Spring OAuth2 Resource Server (validates Keycloak JWTs via JWKS)
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 }
 
 tasks.named('test') {

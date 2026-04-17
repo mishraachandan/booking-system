@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, inject, effect } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
+import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
 
 @Component({
   selector: 'app-navbar',
@@ -16,6 +17,7 @@ import { AuthService } from '../../../core/services/auth.service';
 
         <div class="nav-links">
           @if (isLoggedIn) {
+            <span class="user-greeting">👤 {{ firstName }}</span>
             <a routerLink="/my-bookings" class="nav-link">My Bookings</a>
             <button class="btn btn-ghost" (click)="logout()">Logout</button>
           } @else {
@@ -68,15 +70,35 @@ import { AuthService } from '../../../core/services/auth.service';
       transition: var(--transition);
       &:hover { color: var(--text-primary); background: var(--bg-card); }
     }
+    .user-greeting {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 500;
+      padding: 0 8px;
+    }
   `]
 })
-export class NavbarComponent implements OnInit {
+export class NavbarComponent {
   isLoggedIn = false;
+  firstName = '';
 
-  constructor(private authService: AuthService) {}
+  private readonly authService = inject(AuthService);
+  private readonly keycloakSignal = inject(KEYCLOAK_EVENT_SIGNAL);
 
-  ngOnInit() {
-    this.authService.isLoggedIn$.subscribe(v => this.isLoggedIn = v);
+  constructor() {
+    // React to Keycloak events via signal (v21 API)
+    effect(() => {
+      const event = this.keycloakSignal();
+      if (event.type === KeycloakEventType.Ready ||
+          event.type === KeycloakEventType.AuthSuccess ||
+          event.type === KeycloakEventType.AuthRefreshSuccess ||
+          event.type === KeycloakEventType.AuthLogout) {
+        this.isLoggedIn = this.authService.isLoggedIn();
+        if (this.isLoggedIn) {
+          this.firstName = this.authService.getFirstName();
+        }
+      }
+    });
   }
 
   logout() {
