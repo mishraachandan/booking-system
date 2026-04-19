@@ -3,9 +3,12 @@ package com.mishraachandan.booking_system.controller;
 import com.mishraachandan.booking_system.config.AuthenticatedUser;
 import com.mishraachandan.booking_system.dto.entity.Show;
 import com.mishraachandan.booking_system.dto.entity.ShowSeat;
+import com.mishraachandan.booking_system.dto.pojo.CreateShowRequest;
+import com.mishraachandan.booking_system.dto.pojo.LockSeatsRequest;
 import com.mishraachandan.booking_system.dto.pojo.ShowSeatResponse;
-import com.mishraachandan.booking_system.service.ShowService;
 import com.mishraachandan.booking_system.service.ShowSeatLockService;
+import com.mishraachandan.booking_system.service.ShowService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -65,14 +68,9 @@ public class ShowController {
     public ResponseEntity<Map<String, Object>> lockSeats(
             @PathVariable Long showId,
             @AuthenticationPrincipal AuthenticatedUser principal,
-            @RequestBody Map<String, List<Long>> request) {
+            @Valid @RequestBody LockSeatsRequest request) {
 
-        List<Long> showSeatIds = request.get("showSeatIds");
-        if (showSeatIds == null || showSeatIds.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "showSeatIds is required"));
-        }
-
-        boolean success = showSeatLockService.lockShowSeats(showSeatIds, principal.getUserId());
+        boolean success = showSeatLockService.lockShowSeats(request.getShowSeatIds(), principal.getUserId());
 
         if (success) {
             return ResponseEntity.ok(Map.of("success", true, "message",
@@ -96,7 +94,7 @@ public class ShowController {
      * Create a new show. Requires ADMIN role (enforced by SecurityConfig).
      */
     @PostMapping
-    public ResponseEntity<Show> createShow(@RequestBody Show show) {
-        return ResponseEntity.ok(showService.createShow(show));
+    public ResponseEntity<Show> createShow(@Valid @RequestBody CreateShowRequest request) {
+        return ResponseEntity.ok(showService.createShow(request));
     }
 }

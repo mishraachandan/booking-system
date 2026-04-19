@@ -58,3 +58,20 @@ keycloak:
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
   migration:
     enabled: ${KEYCLOAK_MIGRATION_ENABLED:true}
+
+# Restrict Spring Boot Actuator to a minimal, safe set of endpoints. Even
+# with the Spring Security filter chain in place, explicitly pinning the
+# exposed endpoints prevents accidentally shipping /actuator/env,
+# /actuator/beans, /actuator/heapdump, etc. if a future config loosens access.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+  info:
+    env:
+      enabled: false

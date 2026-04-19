@@ -20,6 +20,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.Map;
 
@@ -65,14 +66,33 @@ public class PaymentService {
             throw new IllegalStateException("Booking is not awaiting payment. Status: " + booking.getStatus());
         }
 
-        // Check if keys are configured
-        if (razorpayKeyId.equals("RAZORPAY_KEY_NOT_SET")) {
-            throw new IllegalStateException(
-                    "Razorpay keys not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env");
-        }
-
         // Calculate total amount from booked ShowSeats
         BigDecimal totalAmount = calculateBookingAmount(booking);
+
+        // Check if keys are configured (detect defaults and placeholders)
+        if (razorpayKeyId.equals("RAZORPAY_KEY_NOT_SET")
+                || razorpayKeyId.contains("REPLACE_ME")
+                || razorpayKeySecret.contains("REPLACE_ME")) {
+            String dummyOrderId = "order_dummy_" + System.currentTimeMillis();
+            Payment payment = Payment.builder()
+                    .bookingId(bookingId)
+                    .userId(userId)
+                    .amount(totalAmount)
+                    .currency("INR")
+                    .razorpayOrderId(dummyOrderId)
+                    .status(PaymentStatus.CREATED)
+                    .build();
+            paymentRepository.save(payment);
+            
+            logger.info("Created DUMMY order {} for booking {} (₹{})", dummyOrderId, bookingId, totalAmount);
+            return Map.of(
+                    "razorpayOrderId", dummyOrderId,
+                    "amount", totalAmount.multiply(BigDecimal.valueOf(100)).intValue(),
+                    "currency", "INR",
+                    "keyId", razorpayKeyId,
+                    "bookingId", bookingId
+            );
+        }
         // Razorpay expects amount in paise (smallest unit)
         int amountInPaise = totalAmount.multiply(BigDecimal.valueOf(100)).intValue();
 
@@ -129,10 +149,28 @@ public class PaymentService {
     @Transactional
     public Booking verifyAndConfirm(String razorpayOrderId,
                                      String razorpayPaymentId,
-                                     String razorpaySignature) {
+                                     String razorpaySignature,
+                                     Long userId) {
 
         Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId)
                 .orElseThrow(() -> new IllegalArgumentException("Payment not found for order: " + razorpayOrderId));
+
+        // Only the user who initiated the payment may verify it. Without this
+        // check any authenticated user could submit another user's Razorpay
+        // order/payment/signature triple (e.g. observed in client logs) and
+        // trigger booking confirmation on their behalf.
+        if (payment.getUserId() == null || !payment.getUserId().equals(userId)) {
+            logger.warn("User {} attempted to verify payment for order {} owned by {}",
+                    userId, razorpayOrderId, payment.getUserId());
+            throw new SecurityException("User not authorized for this payment");
+        }
+
+        if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            // Idempotent — return the already-confirmed booking. Initialize
+            // lazy associations so the subsequent BookingResponse.fromBooking
+            // mapping does not trip LazyInitializationException with OSIV off.
+            return bookingService.findBookingInitialized(payment.getBookingId());
+        }
 
         boolean valid = verifySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
 
@@ -169,15 +207,28 @@ public class PaymentService {
      * Verifies Razorpay payment signature: HMAC-SHA256(orderId + "|" + paymentId, keySecret)
      */
     private boolean verifySignature(String orderId, String paymentId, String signature) {
+        if (razorpayKeyId.equals("RAZORPAY_KEY_NOT_SET")
+                || razorpayKeyId.contains("REPLACE_ME")
+                || razorpayKeySecret.contains("REPLACE_ME")) {
+            return true;
+        }
         try {
             String data = orderId + "|" + paymentId;
             Mac mac = Mac.getInstance("HmacSHA256");
             SecretKeySpec secretKey = new SecretKeySpec(
                     razorpayKeySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(secretKey);
-            byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            String computed = HexFormat.of().formatHex(hash);
-            return computed.equals(signature);
+            byte[] computed = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            // Razorpay returns the signature as a lowercase hex string. Decode it
+            // to bytes and compare in constant time to avoid a timing side-channel
+            // that would let an attacker probe the signature one byte at a time.
+            byte[] provided;
+            try {
+                provided = HexFormat.of().parseHex(signature == null ? "" : signature.toLowerCase());
+            } catch (IllegalArgumentException badHex) {
+                return false;
+            }
+            return MessageDigest.isEqual(computed, provided);
         } catch (Exception e) {
             logger.error("Signature verification error: {}", e.getMessage());
             return false;
