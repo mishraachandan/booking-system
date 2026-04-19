@@ -47,10 +47,15 @@ import { FormsModule } from '@angular/forms';
               </div>
             }
           </div>
+        } @else if (cityWarning) {
+          <div class="city-warning">
+            <span>📍</span>
+            <p>Please select your city first to browse movies and book tickets.</p>
+          </div>
         } @else if (movies.length === 0) {
           <div class="empty-state">
             <span class="empty-icon">🎭</span>
-            <p>No movies found. Select a city or check back later!</p>
+            <p>No movies found for this city. Check back later!</p>
           </div>
         } @else {
           <div class="movie-grid">
@@ -214,6 +219,15 @@ import { FormsModule } from '@angular/forms';
       .empty-icon { font-size: 48px; display: block; margin-bottom: 16px; }
     }
 
+    .city-warning {
+      text-align: center; padding: 48px 20px;
+      background: rgba(243, 156, 18, 0.06);
+      border: 1px dashed rgba(243, 156, 18, 0.3);
+      border-radius: var(--radius);
+      span { font-size: 40px; display: block; margin-bottom: 12px; }
+      p { color: #f39c12; font-size: 16px; font-weight: 500; }
+    }
+
     .shows-section {
       padding: 0 0 60px;
       scroll-margin-top: 80px;
@@ -262,7 +276,8 @@ export class HomeComponent implements OnInit {
   movies: Movie[] = [];
   movieShows: Show[] = [];
   selectedMovie: Movie | null = null;
-  loading = true;
+  loading = false;
+  cityWarning = true;
 
   constructor(
     private showService: ShowService,
@@ -271,7 +286,7 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     this.cityService.getCities().subscribe(c => this.cities = c);
-    this.loadShows();
+    // Don't load shows until a city is selected
   }
 
   loadShows() {
@@ -296,14 +311,23 @@ export class HomeComponent implements OnInit {
   onCityChange() {
     this.selectedMovie = null;
     this.movieShows = [];
-    this.loadShows();
+    this.cityWarning = this.selectedCityId == 0;
+    if (!this.cityWarning) {
+      this.loadShows();
+    } else {
+      this.shows = [];
+      this.movies = [];
+    }
   }
 
   selectMovie(movie: Movie) {
+    if (this.selectedCityId == 0) {
+      this.cityWarning = true;
+      return;
+    }
     this.selectedMovie = movie;
-    this.showService.getShowsByMovie(movie.id).subscribe(s => {
-      this.movieShows = s;
-      setTimeout(() => document.getElementById('shows')?.scrollIntoView({ behavior: 'smooth' }), 100);
-    });
+    // Filter shows for this movie that belong to the selected city
+    this.movieShows = this.shows.filter(s => s.movie?.id === movie.id);
+    setTimeout(() => document.getElementById('shows')?.scrollIntoView({ behavior: 'smooth' }), 100);
   }
 }

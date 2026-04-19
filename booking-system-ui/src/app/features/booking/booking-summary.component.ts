@@ -193,7 +193,21 @@ export class BookingSummaryComponent implements OnInit {
     this.paymentService.createOrder(this.bookingId).subscribe({
       next: (order) => {
         this.loading = false;
-        this.openRazorpayPopup(order);
+        // Dummy payment flow: trigger if the server signalled dummy mode via
+        // either the placeholder Razorpay key or the dummy order-id prefix.
+        // The server enters dummy mode when keyId OR keySecret contains the
+        // placeholder, so matching on keyId alone is insufficient — we also
+        // fall back to the dummy order-id prefix returned by the backend.
+        const isDummy =
+          order.keyId === 'RAZORPAY_KEY_NOT_SET' ||
+          order.keyId.includes('REPLACE_ME') ||
+          (typeof order.razorpayOrderId === 'string' &&
+            order.razorpayOrderId.startsWith('order_dummy_'));
+        if (isDummy) {
+          this.verifyPayment(order.razorpayOrderId, 'dummy_payment_id', 'dummy_signature');
+        } else {
+          this.openRazorpayPopup(order);
+        }
       },
       error: (err) => {
         this.loading = false;

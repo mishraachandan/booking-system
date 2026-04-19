@@ -83,13 +83,20 @@ public class JwtUtil {
             Jwts.parser().verifyWith((javax.crypto.SecretKey) key()).build().parse(authToken);
             return true;
         } catch (MalformedJwtException e) {
-            logger.error("Invalid JWT token: {}", e.getMessage());
+            logger.debug("Invalid JWT token: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
-            logger.error("JWT token is expired: {}", e.getMessage());
+            logger.debug("JWT token is expired: {}", e.getMessage());
         } catch (UnsupportedJwtException e) {
-            logger.error("JWT token is unsupported: {}", e.getMessage());
+            logger.debug("JWT token is unsupported: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            logger.error("JWT claims string is empty: {}", e.getMessage());
+            logger.debug("JWT claims string is empty: {}", e.getMessage());
+        } catch (Exception e) {
+            // Catch-all so unexpected decode/parse errors (e.g. a Keycloak
+            // RS256 token whose base64url payload contains '-'/'_' characters
+            // that the legacy HS384 parser cannot decode) are treated as
+            // "not a legacy token" and fall through to the Keycloak
+            // OAuth2 resource server instead of bubbling up as 500/401.
+            logger.debug("Legacy JWT validation failed: {}", e.getMessage());
         }
         return false;
     }
