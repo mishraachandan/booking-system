@@ -8,6 +8,7 @@ import com.mishraachandan.booking_system.dto.entity.SeatStatus;
 import com.mishraachandan.booking_system.dto.status.BookingStatus;
 import com.mishraachandan.booking_system.dto.entity.User;
 import com.mishraachandan.booking_system.dto.pojo.BookingRequest;
+import com.mishraachandan.booking_system.dto.pojo.BookingResponse;
 import com.mishraachandan.booking_system.dto.pojo.ShowSeatBookingRequest;
 import com.mishraachandan.booking_system.repository.BookableResourceRepository;
 import com.mishraachandan.booking_system.repository.BookingRepository;
@@ -16,6 +17,7 @@ import com.mishraachandan.booking_system.repository.ShowSeatRepository;
 import com.mishraachandan.booking_system.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,9 @@ import java.util.List;
 public class BookingService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookingService.class);
+
+    // Auto-cancel bookings that are AWAITING_PAYMENT for more than this many minutes
+    private static final int PAYMENT_TIMEOUT_MINUTES = 10;
 
     private final BookingRepository bookingRepository;
     private final BookableResourceRepository resourceRepository;
@@ -45,6 +50,8 @@ public class BookingService {
         this.showRepository = showRepository;
         this.showSeatRepository = showSeatRepository;
     }
+
+    // ─── Generic Booking ─────────────────────────────────────────────────────────
 
     /**
      * Place a new generic booking for a user (Event-based, non-seated).
@@ -92,9 +99,12 @@ public class BookingService {
         return savedBooking;
     }
 
+    // ─── Show-Seat Booking ────────────────────────────────────────────────────────
+
     /**
      * Book specific ShowSeats for a show.
      * Validates that seats are locked by the requesting user, marks them BOOKED,
+     * links them to the booking (for later seat-release if payment expires),
      * and creates a booking in AWAITING_PAYMENT status.
      */
     @Transactional
@@ -105,8 +115,8 @@ public class BookingService {
         Show show = showRepository.findById(request.getShowId())
                 .orElseThrow(() -> new IllegalArgumentException("Show not found: " + request.getShowId()));
 
-        if (show.getStartTime().isBefore(LocalDateTime.now())) {
-            throw new IllegalStateException("Cannot book: Show has already started");
+        if (show.getEndTime().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Cannot book: Show has already ended");
         }
 
         List<ShowSeat> showSeats = showSeatRepository.findAllById(request.getShowSeatIds());
@@ -130,15 +140,7 @@ public class BookingService {
             totalPrice = totalPrice.add(ss.getPrice());
         }
 
-        // Mark all ShowSeats as BOOKED
-        for (ShowSeat ss : showSeats) {
-            ss.setStatus(SeatStatus.BOOKED);
-            ss.setLockedAt(null);
-            ss.setLockedByUserId(null);
-        }
-        showSeatRepository.saveAll(showSeats);
-
-        // Create booking in AWAITING_PAYMENT status
+        // Create the booking first so we have an ID to link to ShowSeats
         Booking booking = Booking.builder()
                 .user(user)
                 .show(show)
@@ -148,16 +150,27 @@ public class BookingService {
                 .startTime(show.getStartTime())
                 .endTime(show.getEndTime())
                 .build();
-
         Booking savedBooking = bookingRepository.save(booking);
+
+        // Mark all ShowSeats as BOOKED and link to booking (for release on expiry)
+        for (ShowSeat ss : showSeats) {
+            ss.setStatus(SeatStatus.BOOKED);
+            ss.setLockedAt(null);
+            ss.setLockedByUserId(null);
+            ss.setBookingId(savedBooking.getId());
+        }
+        showSeatRepository.saveAll(showSeats);
+
         logger.info("Booking {} created for user {} with {} seats on show {} (total: ₹{}). Status: AWAITING_PAYMENT",
                 savedBooking.getId(), userId, showSeats.size(), request.getShowId(), totalPrice);
 
         return savedBooking;
     }
 
+    // ─── Confirm Booking ─────────────────────────────────────────────────────────
+
     /**
-     * Confirm a booking after payment is successful.
+     * Confirm a booking after payment is successfully verified.
      */
     @Transactional
     public Booking confirmBooking(Long bookingId) {
@@ -174,16 +187,54 @@ public class BookingService {
         return confirmed;
     }
 
+    // ─── Seat Release ─────────────────────────────────────────────────────────────
+
     /**
-     * Get all bookings for a user.
+     * Releases all ShowSeats belonging to a booking back to AVAILABLE.
+     * Called when payment fails or a booking expires.
      */
+    @Transactional
+    public void releaseSeatsForBooking(Long bookingId) {
+        int released = showSeatRepository.releaseByBookingId(bookingId);
+        logger.info("Released {} seats for booking {}", released, bookingId);
+    }
+
+    // ─── Auto-Expiry Scheduled Task ───────────────────────────────────────────────
+
+    /**
+     * Runs every 5 minutes.
+     * Finds bookings stuck in AWAITING_PAYMENT for more than PAYMENT_TIMEOUT_MINUTES,
+     * releases their seats, and marks them as EXPIRED.
+     */
+    @Scheduled(fixedDelay = 5 * 60 * 1000) // every 5 minutes
+    @Transactional
+    public void cancelExpiredPaymentBookings() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(PAYMENT_TIMEOUT_MINUTES);
+        List<Booking> expiredBookings = bookingRepository.findByStatusAndCreatedAtBefore(
+                BookingStatus.AWAITING_PAYMENT, cutoff);
+
+        if (expiredBookings.isEmpty()) return;
+
+        logger.info("Auto-expiry: found {} bookings to expire", expiredBookings.size());
+
+        for (Booking booking : expiredBookings) {
+            releaseSeatsForBooking(booking.getId());
+            booking.setStatus(BookingStatus.EXPIRED);
+            bookingRepository.save(booking);
+            logger.info("Booking {} expired and seats released", booking.getId());
+        }
+    }
+
+    // ─── Queries ──────────────────────────────────────────────────────────────────
+
+    public List<BookingResponse> getUserBookingsFlat(Long userId) {
+        return bookingRepository.findBookingResponsesByUserId(userId);
+    }
+
     public List<Booking> getUserBookings(Long userId) {
         return bookingRepository.findByUserId(userId);
     }
 
-    /**
-     * Cancel a booking.
-     */
     @Transactional
     public void cancelBooking(Long bookingId, Long userId) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -191,6 +242,11 @@ public class BookingService {
 
         if (!booking.getUser().getId().equals(userId)) {
             throw new SecurityException("User not authorized to cancel this booking");
+        }
+
+        // Release seats if booking was in AWAITING_PAYMENT
+        if (booking.getStatus() == BookingStatus.AWAITING_PAYMENT) {
+            releaseSeatsForBooking(bookingId);
         }
 
         booking.setStatus(BookingStatus.CANCELLED);

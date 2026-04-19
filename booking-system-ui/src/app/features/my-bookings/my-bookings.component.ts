@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { BookingService, Booking } from '../../core/services/booking.service';
+import { BookingService, BookingResponse } from '../../core/services/booking.service';
 
 @Component({
   selector: 'app-my-bookings',
@@ -20,29 +20,29 @@ import { BookingService, Booking } from '../../core/services/booking.service';
         </div>
       } @else {
         <div class="bookings-list">
-          @for (booking of bookings; track booking.id) {
+          @for (booking of bookings; track booking.bookingId) {
             <div class="card booking-card">
               <div class="booking-main">
                 <div class="booking-info">
-                  <h3>{{ booking.show?.movie?.title || 'Event Booking' }}</h3>
+                  <h3>{{ booking.movieTitle || booking.resourceName || 'Event Booking' }}</h3>
                   <p class="meta">
-                    @if (booking.show) {
-                      {{ booking.show?.screen?.cinema?.name }} · {{ booking.show?.screen?.name }}
+                    @if (booking.cinemaName) {
+                      {{ booking.cinemaName }} · {{ booking.screenName }}
                     }
                   </p>
-                  <p class="meta">{{ booking.startTime | date:'MMM d, yyyy · hh:mm a' }}</p>
+                  <p class="meta">{{ booking.showStartTime || booking.startTime | date:'MMM d, yyyy · hh:mm a' }}</p>
                   <p class="tickets">{{ booking.numberOfTickets }} ticket{{ booking.numberOfTickets > 1 ? 's' : '' }}</p>
                 </div>
                 <div class="booking-status">
                   <span class="status-badge" [class]="booking.status.toLowerCase()">
-                    {{ booking.status }}
+                    {{ booking.status | titlecase }}
                   </span>
-                  <span class="booking-id">#{{ booking.id }}</span>
+                  <span class="booking-id">#{{ booking.bookingId }}</span>
                 </div>
               </div>
               @if (booking.status === 'CONFIRMED' || booking.status === 'AWAITING_PAYMENT') {
                 <div class="booking-actions">
-                  <button class="btn btn-ghost danger" (click)="cancel(booking.id)">Cancel</button>
+                  <button class="btn btn-ghost danger" (click)="cancel(booking.bookingId)">Cancel Booking</button>
                 </div>
               }
             </div>
@@ -88,7 +88,7 @@ import { BookingService, Booking } from '../../core/services/booking.service';
   `]
 })
 export class MyBookingsComponent implements OnInit {
-  bookings: Booking[] = [];
+  bookings: BookingResponse[] = [];
   loading = true;
 
   constructor(private bookingService: BookingService) {}

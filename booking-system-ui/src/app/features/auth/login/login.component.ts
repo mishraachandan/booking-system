@@ -1,45 +1,42 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 
+/**
+ * Login component — now a minimal redirect bridge.
+ * When the route /login is hit, it immediately redirects the user to the
+ * Keycloak-hosted login page. After successful login, Keycloak redirects back
+ * to the app (via redirect_uri = returnUrl or '/').
+ *
+ * If the user is already logged in, they are sent directly to the return URL.
+ */
 @Component({
   selector: 'app-login',
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule],
   template: `
     <div class="auth-page page-enter">
       <div class="auth-card card">
         <div class="auth-header">
-          <h1>Welcome back</h1>
-          <p>Sign in to your account</p>
+          <div class="kc-logo">🔐</div>
+          <h1>Signing you in…</h1>
+          <p>You are being redirected to the secure login page.</p>
           @if (fromBooking) {
-            <div class="info-banner">🎬 Please sign in to complete your booking</div>
+            <div class="info-banner">🎬 Sign in to complete your booking</div>
           }
         </div>
 
-        <form (ngSubmit)="onLogin()">
-          <div class="form-group">
-            <label>Email</label>
-            <input type="email" [(ngModel)]="email" name="email" placeholder="you@email.com" required />
-          </div>
-          <div class="form-group">
-            <label>Password</label>
-            <input type="password" [(ngModel)]="password" name="password" placeholder="••••••••" required />
-          </div>
+        <div class="spinner-row">
+          <div class="spinner"></div>
+        </div>
 
-          @if (error) {
-            <div class="error-msg">{{ error }}</div>
-          }
-
-          <button type="submit" class="btn btn-primary full-width" [disabled]="loading">
-            {{ loading ? 'Signing in...' : 'Sign In' }}
-          </button>
-        </form>
-
-        <p class="auth-footer">
-          Don't have an account? <a routerLink="/register" class="link">Sign up</a>
+        <p class="redirect-note">
+          Redirecting to Keycloak SSO…
         </p>
+
+        <button class="btn btn-primary full-width" (click)="redirectToLogin()">
+          Click here if you are not redirected
+        </button>
       </div>
     </div>
   `,
@@ -48,10 +45,11 @@ import { AuthService } from '../../../core/services/auth.service';
       display: flex; justify-content: center; align-items: center;
       min-height: calc(100vh - 64px); padding: 20px;
     }
-    .auth-card { width: 100%; max-width: 420px; padding: 40px; }
+    .auth-card { width: 100%; max-width: 420px; padding: 40px; text-align: center; }
     .auth-header {
-      text-align: center; margin-bottom: 32px;
-      h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+      margin-bottom: 32px;
+      .kc-logo { font-size: 48px; margin-bottom: 16px; }
+      h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
       p { color: var(--text-muted); font-size: 15px; }
     }
     .info-banner {
@@ -59,44 +57,37 @@ import { AuthService } from '../../../core/services/auth.service';
       background: rgba(226, 55, 68, 0.1); border: 1px solid rgba(226, 55, 68, 0.3);
       border-radius: var(--radius-sm); color: var(--accent); font-size: 13px;
     }
+    .spinner-row { display: flex; justify-content: center; margin: 24px 0; }
+    .spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .redirect-note { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; }
     .full-width { width: 100%; }
-    .error-msg {
-      background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3);
-      color: var(--danger); padding: 10px 14px;
-      border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px;
-    }
-    .auth-footer {
-      text-align: center; margin-top: 24px; font-size: 14px; color: var(--text-muted);
-      .link { color: var(--accent); font-weight: 500; }
-    }
   `]
 })
-export class LoginComponent {
-  email = '';
-  password = '';
-  error = '';
-  loading = false;
-  returnUrl = '/';
+export class LoginComponent implements OnInit {
   fromBooking = false;
+  private returnUrl = '/';
 
   constructor(
     private auth: AuthService,
-    private router: Router,
     private route: ActivatedRoute
   ) {
     this.returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') || '/';
-    this.fromBooking = this.returnUrl.includes('/show/') || this.returnUrl.includes('/booking');
+    this.fromBooking =
+      this.returnUrl.includes('/show/') || this.returnUrl.includes('/booking');
   }
 
-  onLogin() {
-    this.loading = true;
-    this.error = '';
-    this.auth.login(this.email, this.password).subscribe({
-      next: () => { this.router.navigateByUrl(this.returnUrl); },
-      error: (err) => {
-        this.error = err.error || err.message || 'Invalid email or password';
-        this.loading = false;
-      }
-    });
+  ngOnInit() {
+    // Auto-redirect on load
+    setTimeout(() => this.redirectToLogin(), 500);
+  }
+
+  redirectToLogin() {
+    this.auth.login();
   }
 }

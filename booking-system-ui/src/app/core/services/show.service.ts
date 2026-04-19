@@ -65,8 +65,9 @@ export class ShowService {
 
   constructor(private http: HttpClient) {}
 
-  getAllShows(): Observable<Show[]> {
-    return this.http.get<Show[]>(this.baseUrl);
+  getAllShows(cityId?: number): Observable<Show[]> {
+    const params = cityId && cityId > 0 ? `?cityId=${cityId}` : '';
+    return this.http.get<Show[]>(`${this.baseUrl}${params}`);
   }
 
   getShowsByMovie(movieId: number): Observable<Show[]> {

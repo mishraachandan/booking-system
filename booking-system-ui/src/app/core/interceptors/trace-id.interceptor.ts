@@ -1,14 +1,15 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 
+/**
+ * Injects a unique X-Trace-Id header on every outgoing request for server-side MDC logging.
+ * NOTE: X-User-Id is no longer injected here — userId is now carried securely in the JWT.
+ */
 export const traceIdInterceptor: HttpInterceptorFn = (req, next) => {
   const traceId = crypto.randomUUID().replace(/-/g, '').substring(0, 16);
-  const userId = localStorage.getItem('userId');
 
-  let headers = req.headers.set('X-Trace-Id', traceId);
-  if (userId) {
-    headers = headers.set('X-User-Id', userId);
-  }
+  const cloned = req.clone({
+    headers: req.headers.set('X-Trace-Id', traceId),
+  });
 
-  const cloned = req.clone({ headers });
   return next(cloned);
 };
