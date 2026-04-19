@@ -176,6 +176,8 @@ public class BookingService {
 
     /**
      * Confirm a booking after payment is successfully verified.
+     * Internal callers (e.g. the payment webhook / signature-verification
+     * flow) should use this method directly once they have validated payment.
      */
     @Transactional
     public Booking confirmBooking(Long bookingId) {
@@ -192,6 +194,25 @@ public class BookingService {
         
         initializeBookingProxies(confirmed);
         return confirmed;
+    }
+
+    /**
+     * Owner-scoped variant for the HTTP confirm endpoint. Required because the
+     * Spring Security filter chain only authorises "has role USER" on
+     * /api/bookings/** — without this check, any logged-in user can POST
+     * /api/bookings/{someoneElsesBookingId}/confirm and flip another user's
+     * booking to CONFIRMED without paying.
+     */
+    @Transactional
+    public Booking confirmBookingForUser(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new SecurityException("User not authorized to confirm this booking");
+        }
+
+        return confirmBooking(bookingId);
     }
 
     // ─── Seat Release ─────────────────────────────────────────────────────────────
@@ -259,6 +280,21 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
         logger.info("Booking {} cancelled by user {}", bookingId, userId);
+    }
+
+    /**
+     * Loads a booking by id and eagerly initializes the associations that
+     * {@code BookingResponse.fromBooking} touches, so the returned entity can
+     * be safely serialized outside of an open Hibernate session. Used on the
+     * idempotent early-return path of {@code PaymentService.verifyAndConfirm}
+     * to prevent {@code LazyInitializationException}.
+     */
+    @Transactional(readOnly = true)
+    public Booking findBookingInitialized(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
+        initializeBookingProxies(booking);
+        return booking;
     }
 
     private void initializeBookingProxies(Booking booking) {

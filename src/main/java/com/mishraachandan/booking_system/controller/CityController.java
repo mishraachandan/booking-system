@@ -1,7 +1,9 @@
 package com.mishraachandan.booking_system.controller;
 
 import com.mishraachandan.booking_system.dto.entity.City;
+import com.mishraachandan.booking_system.dto.pojo.CreateCityRequest;
 import com.mishraachandan.booking_system.service.CityService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +23,7 @@ public class CityController {
     }
 
     @PostMapping
-    public ResponseEntity<City> createCity(@RequestBody City city) {
-        return ResponseEntity.ok(cityService.createCity(city));
+    public ResponseEntity<City> createCity(@Valid @RequestBody CreateCityRequest request) {
+        return ResponseEntity.ok(cityService.createCity(request));
     }
 }

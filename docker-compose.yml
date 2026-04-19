@@ -42,8 +42,28 @@ services:
     networks:
       - booking-network
 
+  app-db:
+    image: postgres:16-alpine
+    container_name: app-db
+    environment:
+      POSTGRES_DB: booking
+      POSTGRES_USER: booking
+      POSTGRES_PASSWORD: booking
+    ports:
+      - "5433:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booking"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - booking-network
+
 volumes:
   keycloak-db-data:
+  app-db-data:
 
 networks:
   booking-network:

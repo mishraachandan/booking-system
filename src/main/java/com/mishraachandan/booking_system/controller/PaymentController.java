@@ -57,7 +57,9 @@ public class PaymentController {
      * Body: { "razorpayOrderId", "razorpayPaymentId", "razorpaySignature" }
      */
     @PostMapping("/verify")
-    public ResponseEntity<?> verifyPayment(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> verifyPayment(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestBody Map<String, String> body) {
 
         String razorpayOrderId = body.get("razorpayOrderId");
         String razorpayPaymentId = body.get("razorpayPaymentId");
@@ -69,7 +71,8 @@ public class PaymentController {
         }
 
         try {
-            Booking confirmed = paymentService.verifyAndConfirm(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+            Booking confirmed = paymentService.verifyAndConfirm(
+                    razorpayOrderId, razorpayPaymentId, razorpaySignature, principal.getUserId());
             return ResponseEntity.ok(BookingResponse.fromBooking(confirmed));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
@@ -89,6 +92,12 @@ public class PaymentController {
 
         try {
             Payment payment = paymentService.getLatestPaymentForBooking(bookingId);
+            // Prevent an authenticated user from reading someone else's payment
+            // status by guessing booking IDs.
+            if (payment.getUserId() == null || !payment.getUserId().equals(principal.getUserId())) {
+                return ResponseEntity.status(404)
+                        .body(Map.of("error", "No payment found for booking: " + bookingId));
+            }
             return ResponseEntity.ok(Map.of(
                     "paymentId", payment.getId(),
                     "bookingId", payment.getBookingId(),

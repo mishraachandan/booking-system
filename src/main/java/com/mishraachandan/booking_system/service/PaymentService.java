@@ -20,6 +20,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.Map;
 
@@ -148,10 +149,28 @@ public class PaymentService {
     @Transactional
     public Booking verifyAndConfirm(String razorpayOrderId,
                                      String razorpayPaymentId,
-                                     String razorpaySignature) {
+                                     String razorpaySignature,
+                                     Long userId) {
 
         Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId)
                 .orElseThrow(() -> new IllegalArgumentException("Payment not found for order: " + razorpayOrderId));
+
+        // Only the user who initiated the payment may verify it. Without this
+        // check any authenticated user could submit another user's Razorpay
+        // order/payment/signature triple (e.g. observed in client logs) and
+        // trigger booking confirmation on their behalf.
+        if (payment.getUserId() == null || !payment.getUserId().equals(userId)) {
+            logger.warn("User {} attempted to verify payment for order {} owned by {}",
+                    userId, razorpayOrderId, payment.getUserId());
+            throw new SecurityException("User not authorized for this payment");
+        }
+
+        if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            // Idempotent — return the already-confirmed booking. Initialize
+            // lazy associations so the subsequent BookingResponse.fromBooking
+            // mapping does not trip LazyInitializationException with OSIV off.
+            return bookingService.findBookingInitialized(payment.getBookingId());
+        }
 
         boolean valid = verifySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
 
@@ -199,9 +218,17 @@ public class PaymentService {
             SecretKeySpec secretKey = new SecretKeySpec(
                     razorpayKeySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(secretKey);
-            byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            String computed = HexFormat.of().formatHex(hash);
-            return computed.equals(signature);
+            byte[] computed = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            // Razorpay returns the signature as a lowercase hex string. Decode it
+            // to bytes and compare in constant time to avoid a timing side-channel
+            // that would let an attacker probe the signature one byte at a time.
+            byte[] provided;
+            try {
+                provided = HexFormat.of().parseHex(signature == null ? "" : signature.toLowerCase());
+            } catch (IllegalArgumentException badHex) {
+                return false;
+            }
+            return MessageDigest.isEqual(computed, provided);
         } catch (Exception e) {
             logger.error("Signature verification error: {}", e.getMessage());
             return false;

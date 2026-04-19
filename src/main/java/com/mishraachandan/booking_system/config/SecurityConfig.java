@@ -62,8 +62,21 @@ public class SecurityConfig {
                     ));
                     corsConfig.setAllowedMethods(java.util.List.of(
                             "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-                    corsConfig.setAllowedHeaders(java.util.List.of("*"));
+                    // Explicit allow-list instead of "*". Wildcarding allowed-headers
+                    // together with allowCredentials=true violates the CORS spec and
+                    // is rejected by modern browsers, so we enumerate exactly the
+                    // request headers this API accepts.
+                    corsConfig.setAllowedHeaders(java.util.List.of(
+                            "Authorization",
+                            "Content-Type",
+                            "Accept",
+                            "Origin",
+                            "X-Requested-With",
+                            "X-Trace-Id"
+                    ));
+                    corsConfig.setExposedHeaders(java.util.List.of("X-Trace-Id"));
                     corsConfig.setAllowCredentials(true);
+                    corsConfig.setMaxAge(3600L);
                     return corsConfig;
                 }))
                 .authorizeHttpRequests(auth -> auth

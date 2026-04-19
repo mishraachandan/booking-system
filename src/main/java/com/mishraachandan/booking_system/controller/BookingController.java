@@ -51,10 +51,15 @@ public class BookingController {
 
     /**
      * Confirm a booking after payment.
+     * Only the booking's owner may call this. Payment-gateway signature
+     * verification is handled by {@code /api/payments/verify} which invokes
+     * the underlying booking state change.
      */
     @PostMapping("/{bookingId}/confirm")
-    public ResponseEntity<BookingResponse> confirmBooking(@PathVariable Long bookingId) {
-        Booking booking = bookingService.confirmBooking(bookingId);
+    public ResponseEntity<BookingResponse> confirmBooking(
+            @PathVariable Long bookingId,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        Booking booking = bookingService.confirmBookingForUser(bookingId, principal.getUserId());
         return ResponseEntity.ok(BookingResponse.fromBooking(booking));
     }
 
