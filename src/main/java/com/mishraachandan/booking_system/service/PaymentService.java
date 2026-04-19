@@ -166,10 +166,10 @@ public class PaymentService {
         }
 
         if (payment.getStatus() == PaymentStatus.SUCCESS) {
-            // Idempotent — return the already-confirmed booking.
-            return bookingRepository.findById(payment.getBookingId())
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "Booking not found: " + payment.getBookingId()));
+            // Idempotent — return the already-confirmed booking. Initialize
+            // lazy associations so the subsequent BookingResponse.fromBooking
+            // mapping does not trip LazyInitializationException with OSIV off.
+            return bookingService.findBookingInitialized(payment.getBookingId());
         }
 
         boolean valid = verifySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);

@@ -282,6 +282,21 @@ public class BookingService {
         logger.info("Booking {} cancelled by user {}", bookingId, userId);
     }
 
+    /**
+     * Loads a booking by id and eagerly initializes the associations that
+     * {@code BookingResponse.fromBooking} touches, so the returned entity can
+     * be safely serialized outside of an open Hibernate session. Used on the
+     * idempotent early-return path of {@code PaymentService.verifyAndConfirm}
+     * to prevent {@code LazyInitializationException}.
+     */
+    @Transactional(readOnly = true)
+    public Booking findBookingInitialized(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
+        initializeBookingProxies(booking);
+        return booking;
+    }
+
     private void initializeBookingProxies(Booking booking) {
         if (booking.getUser() != null) {
             org.hibernate.Hibernate.initialize(booking.getUser());
