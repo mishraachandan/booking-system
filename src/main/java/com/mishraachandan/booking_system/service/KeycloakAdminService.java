@@ -8,6 +8,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +27,9 @@ import java.util.Map;
 public class KeycloakAdminService {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakAdminService.class);
+
+    /** Cryptographically strong RNG for temporary-password generation. */
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Value("${keycloak.admin.server-url:http://localhost:8180}")
     private String keycloakServerUrl;
@@ -131,7 +138,8 @@ public class KeycloakAdminService {
     public String findUserIdByEmail(String email) {
         try {
             String adminToken = getAdminToken();
-            String url = keycloakServerUrl + "/admin/realms/" + realm + "/users?email=" + email + "&exact=true";
+            String url = keycloakServerUrl + "/admin/realms/" + realm
+                    + "/users?email=" + urlEncode(email) + "&exact=true";
 
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(adminToken);
@@ -190,7 +198,11 @@ public class KeycloakAdminService {
      * @return Keycloak UUID or null on failure
      */
     public String migrateUser(String email, String firstName, String lastName, boolean isAdmin) {
-        String keycloakId = createUser(email, "TempPass@1234", firstName, lastName);
+        // Generate a fresh per-user random password so leaking one does not
+        // compromise the entire migration cohort. Users are expected to reset
+        // via Keycloak's "Forgot Password" flow before logging in.
+        String tempPassword = generateRandomPassword();
+        String keycloakId = createUser(email, tempPassword, firstName, lastName);
         if (keycloakId != null && isAdmin) {
             try {
                 String adminToken = getAdminToken();
@@ -200,5 +212,23 @@ public class KeycloakAdminService {
             }
         }
         return keycloakId;
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+    private static String urlEncode(String value) {
+        if (value == null) return "";
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Generates a ~32-character password with upper, lower, digit and a special
+     * symbol guaranteed — satisfies Keycloak's default password policy.
+     */
+    private static String generateRandomPassword() {
+        byte[] buf = new byte[24];
+        SECURE_RANDOM.nextBytes(buf);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(buf);
+        return "Kc!" + token + "9";
     }
 }

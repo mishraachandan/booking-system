@@ -1,6 +1,7 @@
 package com.mishraachandan.booking_system.service;
 
 import com.mishraachandan.booking_system.dto.entity.City;
+import com.mishraachandan.booking_system.dto.pojo.CreateCityRequest;
 import com.mishraachandan.booking_system.repository.CityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,9 @@ public class CityService {
         return cityRepository.findAll();
     }
 
-    public City createCity(City city) {
+    public City createCity(CreateCityRequest request) {
+        City city = new City();
+        city.setName(request.getName());
         return cityRepository.save(city);
     }
 }

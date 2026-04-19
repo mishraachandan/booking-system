@@ -1,7 +1,9 @@
 package com.mishraachandan.booking_system.controller;
 
 import com.mishraachandan.booking_system.dto.entity.Cinema;
+import com.mishraachandan.booking_system.dto.pojo.CreateCinemaRequest;
 import com.mishraachandan.booking_system.service.CinemaService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +23,7 @@ public class CinemaController {
     }
 
     @PostMapping
-    public ResponseEntity<Cinema> createCinema(@RequestBody Cinema cinema) {
-        return ResponseEntity.ok(cinemaService.createCinema(cinema));
+    public ResponseEntity<Cinema> createCinema(@Valid @RequestBody CreateCinemaRequest request) {
+        return ResponseEntity.ok(cinemaService.createCinema(request));
     }
 }

@@ -171,6 +171,8 @@ public class BookingService {
 
     /**
      * Confirm a booking after payment is successfully verified.
+     * Internal callers (e.g. the payment webhook / signature-verification
+     * flow) should use this method directly once they have validated payment.
      */
     @Transactional
     public Booking confirmBooking(Long bookingId) {
@@ -185,6 +187,25 @@ public class BookingService {
         Booking confirmed = bookingRepository.save(booking);
         logger.info("Booking {} confirmed", bookingId);
         return confirmed;
+    }
+
+    /**
+     * Owner-scoped variant for the HTTP confirm endpoint. Required because the
+     * Spring Security filter chain only authorises "has role USER" on
+     * /api/bookings/** — without this check, any logged-in user can POST
+     * /api/bookings/{someoneElsesBookingId}/confirm and flip another user's
+     * booking to CONFIRMED without paying.
+     */
+    @Transactional
+    public Booking confirmBookingForUser(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new SecurityException("User not authorized to confirm this booking");
+        }
+
+        return confirmBooking(bookingId);
     }
 
     // ─── Seat Release ─────────────────────────────────────────────────────────────
