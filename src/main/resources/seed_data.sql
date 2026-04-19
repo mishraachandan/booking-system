@@ -90,7 +90,7 @@ BEGIN
 
     idx := 0;
     FOR scr IN (SELECT id FROM screens ORDER BY id) LOOP
-        FOR day_offset IN 0..3 LOOP
+        FOR day_offset IN 1..4 LOOP
             show_date := CURRENT_DATE + day_offset;
 
             FOREACH h IN ARRAY hours_arr LOOP

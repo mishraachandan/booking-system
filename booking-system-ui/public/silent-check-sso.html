@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Silent SSO</title>
+</head>
+<body>
+  <script>
+    // This page is loaded in a hidden iframe by Keycloak.js to silently check/refresh SSO sessions.
+    // It must be served at /silent-check-sso.html in the Angular app's public folder.
+    parent.postMessage(location.href, location.origin);
+  </script>
+</body>
+</html>

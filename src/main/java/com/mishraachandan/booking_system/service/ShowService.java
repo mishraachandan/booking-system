@@ -32,6 +32,10 @@ public class ShowService {
         return showRepository.findAll();
     }
 
+    public List<Show> getShowsByCityId(Long cityId) {
+        return showRepository.findByCityId(cityId);
+    }
+
     public Show createShow(CreateShowRequest request) {
         if (!request.getEndTime().isAfter(request.getStartTime())) {
             throw new IllegalArgumentException("endTime must be after startTime");

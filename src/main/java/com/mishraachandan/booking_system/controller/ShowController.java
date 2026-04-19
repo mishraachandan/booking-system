@@ -1,5 +1,6 @@
 package com.mishraachandan.booking_system.controller;
 
+import com.mishraachandan.booking_system.config.AuthenticatedUser;
 import com.mishraachandan.booking_system.dto.entity.Show;
 import com.mishraachandan.booking_system.dto.entity.ShowSeat;
 import com.mishraachandan.booking_system.dto.pojo.CreateShowRequest;
@@ -10,6 +11,7 @@ import com.mishraachandan.booking_system.service.ShowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,10 +26,13 @@ public class ShowController {
     private final ShowSeatLockService showSeatLockService;
 
     /**
-     * Get all shows.
+     * Get all shows, optionally filtered by city.
      */
     @GetMapping
-    public ResponseEntity<List<Show>> getAllShows() {
+    public ResponseEntity<List<Show>> getAllShows(@RequestParam(required = false) Long cityId) {
+        if (cityId != null && cityId > 0) {
+            return ResponseEntity.ok(showService.getShowsByCityId(cityId));
+        }
         return ResponseEntity.ok(showService.getAllShows());
     }
 
@@ -57,14 +62,15 @@ public class ShowController {
 
     /**
      * Lock seats for a user (temporary hold).
+     * userId is extracted from the JWT via @AuthenticationPrincipal.
      */
     @PostMapping("/{showId}/seats/lock")
     public ResponseEntity<Map<String, Object>> lockSeats(
             @PathVariable Long showId,
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal AuthenticatedUser principal,
             @Valid @RequestBody LockSeatsRequest request) {
 
-        boolean success = showSeatLockService.lockShowSeats(request.getShowSeatIds(), userId);
+        boolean success = showSeatLockService.lockShowSeats(request.getShowSeatIds(), principal.getUserId());
 
         if (success) {
             return ResponseEntity.ok(Map.of("success", true, "message",
@@ -85,7 +91,7 @@ public class ShowController {
     }
 
     /**
-     * Create a new show.
+     * Create a new show. Requires ADMIN role (enforced by SecurityConfig).
      */
     @PostMapping
     public ResponseEntity<Show> createShow(@Valid @RequestBody CreateShowRequest request) {

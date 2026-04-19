@@ -1,8 +1,10 @@
 package com.mishraachandan.booking_system.controller;
 
+import com.mishraachandan.booking_system.config.AuthenticatedUser;
 import com.mishraachandan.booking_system.dto.entity.Seat;
 import com.mishraachandan.booking_system.service.SeatLockService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,16 +31,17 @@ public class SeatController {
 
     /**
      * Lock a seat for a user.
+     * userId is extracted from the JWT via @AuthenticationPrincipal.
      */
     @PostMapping("/lock")
     public ResponseEntity<Map<String, Object>> lockSeat(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal AuthenticatedUser principal,
             @RequestBody Map<String, Object> request) {
 
         Long resourceId = Long.valueOf(request.get("resourceId").toString());
         String seatNumber = request.get("seatNumber").toString();
 
-        boolean success = seatLockService.lockSeat(resourceId, seatNumber, userId);
+        boolean success = seatLockService.lockSeat(resourceId, seatNumber, principal.getUserId());
 
         if (success) {
             return ResponseEntity.ok(Map.of("success", true, "message", "Seat locked successfully"));

@@ -2,17 +2,34 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-export interface Booking {
-  id: number;
-  user: { id: number; firstName: string; lastName: string };
-  show: { id: number; movie: { title: string }; screen: { name: string; cinema: { name: string } }; startTime: string };
-  resource: any;
-  numberOfTickets: number;
+export interface BookingResponse {
+  bookingId: number;
   status: string;
+  numberOfTickets: number;
   notes: string;
   startTime: string;
   endTime: string;
   createdAt: string;
+
+  // User info
+  userId: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+
+  // Show info
+  showId: number | null;
+  movieTitle: string | null;
+  movieGenre: string | null;
+  movieDurationMinutes: number | null;
+  screenName: string | null;
+  cinemaName: string | null;
+  cityName: string | null;
+  showStartTime: string | null;
+
+  // Resource info
+  resourceId: number | null;
+  resourceName: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -21,16 +38,16 @@ export class BookingService {
 
   constructor(private http: HttpClient) {}
 
-  bookShowSeats(showId: number, showSeatIds: number[], notes?: string): Observable<Booking> {
-    return this.http.post<Booking>(`${this.baseUrl}/show-seats`, { showId, showSeatIds, notes });
+  bookShowSeats(showId: number, showSeatIds: number[], notes?: string): Observable<BookingResponse> {
+    return this.http.post<BookingResponse>(`${this.baseUrl}/show-seats`, { showId, showSeatIds, notes });
   }
 
-  confirmBooking(bookingId: number): Observable<Booking> {
-    return this.http.post<Booking>(`${this.baseUrl}/${bookingId}/confirm`, {});
+  confirmBooking(bookingId: number): Observable<BookingResponse> {
+    return this.http.post<BookingResponse>(`${this.baseUrl}/${bookingId}/confirm`, {});
   }
 
-  getMyBookings(): Observable<Booking[]> {
-    return this.http.get<Booking[]>(`${this.baseUrl}/my`);
+  getMyBookings(): Observable<BookingResponse[]> {
+    return this.http.get<BookingResponse[]>(`${this.baseUrl}/my`);
   }
 
   cancelBooking(bookingId: number): Observable<void> {

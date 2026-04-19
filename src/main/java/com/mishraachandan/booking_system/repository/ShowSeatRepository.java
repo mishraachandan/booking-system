@@ -55,4 +55,19 @@ public interface ShowSeatRepository extends JpaRepository<ShowSeat, Long> {
     @Query("UPDATE ShowSeat ss SET ss.status = 'AVAILABLE', ss.lockedAt = null, ss.lockedByUserId = null " +
             "WHERE ss.status = 'LOCKED' AND ss.lockedAt < :cutoffTime")
     int releaseExpiredLocks(@Param("cutoffTime") LocalDateTime cutoffTime);
+
+    /**
+     * Find all ShowSeats that were booked as part of a specific booking.
+     * Used to release seats when a booking expires or payment fails.
+     */
+    List<ShowSeat> findByBookingId(Long bookingId);
+
+    /**
+     * Bulk release seats for a specific booking back to AVAILABLE.
+     */
+    @Modifying
+    @Query("UPDATE ShowSeat ss SET ss.status = 'AVAILABLE', ss.lockedAt = null, " +
+           "ss.lockedByUserId = null, ss.bookingId = null " +
+           "WHERE ss.bookingId = :bookingId")
+    int releaseByBookingId(@Param("bookingId") Long bookingId);
 }

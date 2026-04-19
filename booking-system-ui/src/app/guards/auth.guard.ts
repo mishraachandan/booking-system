@@ -1,16 +1,32 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { AuthService } from '../core/services/auth.service';
+import Keycloak from 'keycloak-js';
 
-export const authGuard: CanActivateFn = (route, state) => {
-  const auth = inject(AuthService);
-  const router = inject(Router);
+export const authGuard: CanActivateFn = async (route, state) => {
+  const keycloak = inject(Keycloak);
 
-  if (auth.getUserId()) {
+  if (keycloak.authenticated) {
     return true;
   }
 
-  // Save the attempted URL and redirect to login
-  router.navigate(['/login'], { queryParams: { returnUrl: state.url } });
+  // Not authenticated → redirect to Keycloak login
+  await keycloak.login({ redirectUri: window.location.origin + state.url });
   return false;
+};
+
+export const adminGuard: CanActivateFn = async (route, state) => {
+  const keycloak = inject(Keycloak);
+  const router = inject(Router);
+
+  if (!keycloak.authenticated) {
+    await keycloak.login({ redirectUri: window.location.origin + state.url });
+    return false;
+  }
+
+  const roles = keycloak.realmAccess?.roles ?? [];
+  if (roles.includes('ADMIN')) {
+    return true;
+  }
+
+  return router.createUrlTree(['/']);
 };
