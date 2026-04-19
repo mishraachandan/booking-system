@@ -193,7 +193,12 @@ export class BookingSummaryComponent implements OnInit {
     this.paymentService.createOrder(this.bookingId).subscribe({
       next: (order) => {
         this.loading = false;
-        this.openRazorpayPopup(order);
+        if (order.keyId === 'RAZORPAY_KEY_NOT_SET' || order.keyId.includes('REPLACE_ME')) {
+          // Dummy payment flow
+          this.verifyPayment(order.razorpayOrderId, 'dummy_payment_id', 'dummy_signature');
+        } else {
+          this.openRazorpayPopup(order);
+        }
       },
       error: (err) => {
         this.loading = false;

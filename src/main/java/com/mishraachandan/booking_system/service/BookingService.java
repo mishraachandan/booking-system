@@ -17,9 +17,11 @@ import com.mishraachandan.booking_system.repository.ShowSeatRepository;
 import com.mishraachandan.booking_system.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -96,6 +98,7 @@ public class BookingService {
         logger.info("Booking {} created for user {} on resource {}", savedBooking.getId(), userId,
                 request.getResourceId());
 
+        initializeBookingProxies(savedBooking);
         return savedBooking;
     }
 
@@ -116,7 +119,8 @@ public class BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Show not found: " + request.getShowId()));
 
         if (show.getEndTime().isBefore(LocalDateTime.now())) {
-            throw new IllegalStateException("Cannot book: Show has already ended");
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Cannot book: Show has already ended");
         }
 
         List<ShowSeat> showSeats = showSeatRepository.findAllById(request.getShowSeatIds());
@@ -164,6 +168,7 @@ public class BookingService {
         logger.info("Booking {} created for user {} with {} seats on show {} (total: ₹{}). Status: AWAITING_PAYMENT",
                 savedBooking.getId(), userId, showSeats.size(), request.getShowId(), totalPrice);
 
+        initializeBookingProxies(savedBooking);
         return savedBooking;
     }
 
@@ -184,6 +189,8 @@ public class BookingService {
         booking.setStatus(BookingStatus.CONFIRMED);
         Booking confirmed = bookingRepository.save(booking);
         logger.info("Booking {} confirmed", bookingId);
+        
+        initializeBookingProxies(confirmed);
         return confirmed;
     }
 
@@ -252,5 +259,29 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
         logger.info("Booking {} cancelled by user {}", bookingId, userId);
+    }
+
+    private void initializeBookingProxies(Booking booking) {
+        if (booking.getUser() != null) {
+            org.hibernate.Hibernate.initialize(booking.getUser());
+        }
+        if (booking.getShow() != null) {
+            org.hibernate.Hibernate.initialize(booking.getShow());
+            if (booking.getShow().getMovie() != null) {
+                org.hibernate.Hibernate.initialize(booking.getShow().getMovie());
+            }
+            if (booking.getShow().getScreen() != null) {
+                org.hibernate.Hibernate.initialize(booking.getShow().getScreen());
+                if (booking.getShow().getScreen().getCinema() != null) {
+                    org.hibernate.Hibernate.initialize(booking.getShow().getScreen().getCinema());
+                    if (booking.getShow().getScreen().getCinema().getCity() != null) {
+                        org.hibernate.Hibernate.initialize(booking.getShow().getScreen().getCinema().getCity());
+                    }
+                }
+            }
+        }
+        if (booking.getResource() != null) {
+            org.hibernate.Hibernate.initialize(booking.getResource());
+        }
     }
 }
