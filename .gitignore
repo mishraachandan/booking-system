@@ -42,4 +42,4 @@ out/
 config.env
 
 ### Logs ###
-logs/
+logs/.env.dev
