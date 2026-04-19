@@ -1,16 +1,21 @@
 package com.mishraachandan.booking_system.service;
 
+import com.mishraachandan.booking_system.dto.entity.AddOn;
 import com.mishraachandan.booking_system.dto.entity.Booking;
 import com.mishraachandan.booking_system.dto.entity.BookableResource;
+import com.mishraachandan.booking_system.dto.entity.BookingAddOn;
 import com.mishraachandan.booking_system.dto.entity.Show;
 import com.mishraachandan.booking_system.dto.entity.ShowSeat;
 import com.mishraachandan.booking_system.dto.entity.SeatStatus;
 import com.mishraachandan.booking_system.dto.status.BookingStatus;
 import com.mishraachandan.booking_system.dto.entity.User;
+import com.mishraachandan.booking_system.dto.pojo.BookingAddOnLine;
 import com.mishraachandan.booking_system.dto.pojo.BookingRequest;
 import com.mishraachandan.booking_system.dto.pojo.BookingResponse;
 import com.mishraachandan.booking_system.dto.pojo.ShowSeatBookingRequest;
+import com.mishraachandan.booking_system.repository.AddOnRepository;
 import com.mishraachandan.booking_system.repository.BookableResourceRepository;
+import com.mishraachandan.booking_system.repository.BookingAddOnRepository;
 import com.mishraachandan.booking_system.repository.BookingRepository;
 import com.mishraachandan.booking_system.repository.ShowRepository;
 import com.mishraachandan.booking_system.repository.ShowSeatRepository;
@@ -40,17 +45,23 @@ public class BookingService {
     private final UserRepository userRepository;
     private final ShowRepository showRepository;
     private final ShowSeatRepository showSeatRepository;
+    private final AddOnRepository addOnRepository;
+    private final BookingAddOnRepository bookingAddOnRepository;
 
     public BookingService(BookingRepository bookingRepository,
             BookableResourceRepository resourceRepository,
             UserRepository userRepository,
             ShowRepository showRepository,
-            ShowSeatRepository showSeatRepository) {
+            ShowSeatRepository showSeatRepository,
+            AddOnRepository addOnRepository,
+            BookingAddOnRepository bookingAddOnRepository) {
         this.bookingRepository = bookingRepository;
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
         this.showRepository = showRepository;
         this.showSeatRepository = showSeatRepository;
+        this.addOnRepository = addOnRepository;
+        this.bookingAddOnRepository = bookingAddOnRepository;
     }
 
     // ─── Generic Booking ─────────────────────────────────────────────────────────
@@ -165,11 +176,46 @@ public class BookingService {
         }
         showSeatRepository.saveAll(showSeats);
 
-        logger.info("Booking {} created for user {} with {} seats on show {} (total: ₹{}). Status: AWAITING_PAYMENT",
-                savedBooking.getId(), userId, showSeats.size(), request.getShowId(), totalPrice);
+        // Attach optional food/beverage/combo add-ons to this booking.
+        // Snapshots the name + unit price so later catalogue price changes
+        // don't retroactively rewrite the invoice for this booking.
+        BigDecimal addOnTotal = persistAddOns(savedBooking.getId(), request.getAddOns());
+
+        logger.info(
+                "Booking {} created for user {} with {} seats on show {} (seats: ₹{}, add-ons: ₹{}). Status: AWAITING_PAYMENT",
+                savedBooking.getId(), userId, showSeats.size(), request.getShowId(), totalPrice, addOnTotal);
 
         initializeBookingProxies(savedBooking);
         return savedBooking;
+    }
+
+    /**
+     * Persists the requested add-on lines for the given booking.
+     * Returns the sum of (unitPrice * quantity) across all lines.
+     */
+    private BigDecimal persistAddOns(Long bookingId, List<BookingAddOnLine> requested) {
+        if (requested == null || requested.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (BookingAddOnLine line : requested) {
+            AddOn addOn = addOnRepository.findById(line.getAddOnId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Add-on not found: " + line.getAddOnId()));
+            if (!Boolean.TRUE.equals(addOn.getAvailable())) {
+                throw new IllegalStateException("Add-on is not available: " + addOn.getId());
+            }
+            BookingAddOn row = BookingAddOn.builder()
+                    .bookingId(bookingId)
+                    .addOnId(addOn.getId())
+                    .name(addOn.getName())
+                    .unitPrice(addOn.getPrice())
+                    .quantity(line.getQuantity())
+                    .build();
+            bookingAddOnRepository.save(row);
+            total = total.add(addOn.getPrice().multiply(BigDecimal.valueOf(line.getQuantity())));
+        }
+        return total;
     }
 
     // ─── Confirm Booking ─────────────────────────────────────────────────────────
@@ -256,7 +302,51 @@ public class BookingService {
     // ─── Queries ──────────────────────────────────────────────────────────────────
 
     public List<BookingResponse> getUserBookingsFlat(Long userId) {
-        return bookingRepository.findBookingResponsesByUserId(userId);
+        List<BookingResponse> responses = bookingRepository.findBookingResponsesByUserId(userId);
+        if (responses.isEmpty()) {
+            return responses;
+        }
+        hydrateAddOnsAndTotals(responses);
+        return responses;
+    }
+
+    /**
+     * Populates seatTotal / addOnTotal / grandTotal / addOns on each response
+     * in a single batch round-trip per metric (seats + add-ons).
+     */
+    private void hydrateAddOnsAndTotals(List<BookingResponse> responses) {
+        List<Long> bookingIds = responses.stream()
+                .map(BookingResponse::getBookingId)
+                .toList();
+
+        java.util.Map<Long, java.math.BigDecimal> seatTotals = new java.util.HashMap<>();
+        for (Long id : bookingIds) {
+            seatTotals.put(id,
+                    bookingRepository.findTotalAmountForBooking(id)
+                            .orElse(java.math.BigDecimal.ZERO));
+        }
+
+        java.util.Map<Long, java.util.List<com.mishraachandan.booking_system.dto.pojo.BookingAddOnResponse>>
+                addOnsByBooking = bookingAddOnRepository.findByBookingIdIn(bookingIds).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                BookingAddOn::getBookingId,
+                                java.util.stream.Collectors.mapping(
+                                        com.mishraachandan.booking_system.dto.pojo.BookingAddOnResponse::fromEntity,
+                                        java.util.stream.Collectors.toList())));
+
+        for (BookingResponse r : responses) {
+            Long id = r.getBookingId();
+            java.math.BigDecimal seat = seatTotals.getOrDefault(id, java.math.BigDecimal.ZERO);
+            java.util.List<com.mishraachandan.booking_system.dto.pojo.BookingAddOnResponse> lines =
+                    addOnsByBooking.getOrDefault(id, java.util.Collections.emptyList());
+            java.math.BigDecimal addOn = lines.stream()
+                    .map(com.mishraachandan.booking_system.dto.pojo.BookingAddOnResponse::getLineTotal)
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            r.setSeatTotal(seat);
+            r.setAddOnTotal(addOn);
+            r.setGrandTotal(seat.add(addOn));
+            r.setAddOns(lines);
+        }
     }
 
     public List<Booking> getUserBookings(Long userId) {

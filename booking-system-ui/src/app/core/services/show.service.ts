@@ -11,6 +11,9 @@ export interface Movie {
   durationMinutes: number;
   releaseDate: string;
   posterUrl: string;
+  trailerUrl?: string;
+  cast?: string[];
+  rating?: number;
 }
 
 export interface Screen {

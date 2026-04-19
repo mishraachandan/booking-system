@@ -13,15 +13,15 @@ INSERT INTO cities (name, created_at, updated_at) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- 2. MOVIES
-INSERT INTO movies (title, description, language, genre, duration_minutes, release_date, poster_url) VALUES
-('The Dark Knight Returns', 'Batman comes out of retirement in this thrilling sequel that challenges the very idea of justice.', 'English', 'Action', 152, '2026-03-01', 'https://placehold.co/300x450/1a1a2e/e23744?text=Dark+Knight'),
-('Pushpa 3: The Rule Continues', 'Pushpa Raj returns to dominate the red sandalwood smuggling syndicate in an epic saga of power.', 'Telugu', 'Action', 168, '2026-02-14', 'https://placehold.co/300x450/1a1a2e/ff6b81?text=Pushpa+3'),
-('Jawan 2', 'A man on a mission takes on systemic corruption with his band of women warriors.', 'Hindi', 'Thriller', 145, '2026-03-15', 'https://placehold.co/300x450/2d1b69/e23744?text=Jawan+2'),
-('RRR: Rise Again', 'The legendary duo returns in an epic tale set during India''s fight for independence.', 'Telugu', 'Drama', 180, '2026-01-26', 'https://placehold.co/300x450/0d3b66/ff6b81?text=RRR+Rise'),
-('Inception 2: Dreamscape', 'Cobb is pulled back into the dream world for one final impossible mission.', 'English', 'Sci-Fi', 158, '2026-03-20', 'https://placehold.co/300x450/1a1a2e/3498db?text=Inception+2'),
-('Stree 3', 'The small town faces a new supernatural threat, bigger and funnier than ever before.', 'Hindi', 'Horror Comedy', 135, '2026-02-28', 'https://placehold.co/300x450/1a1a2e/2ecc71?text=Stree+3'),
-('KGF Chapter 3', 'Rocky Bhai''s legacy is put to the ultimate test in this final chapter of the KGF saga.', 'Kannada', 'Action', 170, '2026-04-01', 'https://placehold.co/300x450/1a1a2e/f39c12?text=KGF+3'),
-('Animal Park', 'A troubled son navigates the dark world of his father''s criminal empire.', 'Hindi', 'Crime', 155, '2026-03-10', 'https://placehold.co/300x450/1a1a2e/e74c3c?text=Animal+Park');
+INSERT INTO movies (title, description, language, genre, duration_minutes, release_date, poster_url, trailer_url, cast_members, rating) VALUES
+('The Dark Knight Returns', 'Batman comes out of retirement in this thrilling sequel that challenges the very idea of justice.', 'English', 'Action', 152, '2026-03-01', 'https://placehold.co/300x450/1a1a2e/e23744?text=Dark+Knight', 'https://www.youtube.com/embed/EXeTwQWrcwY', 'Christian Bale, Heath Ledger, Aaron Eckhart, Michael Caine, Gary Oldman', 9.0),
+('Pushpa 3: The Rule Continues', 'Pushpa Raj returns to dominate the red sandalwood smuggling syndicate in an epic saga of power.', 'Telugu', 'Action', 168, '2026-02-14', 'https://placehold.co/300x450/1a1a2e/ff6b81?text=Pushpa+3', 'https://www.youtube.com/embed/pKctjlxbFDc', 'Allu Arjun, Rashmika Mandanna, Fahadh Faasil', 8.3),
+('Jawan 2', 'A man on a mission takes on systemic corruption with his band of women warriors.', 'Hindi', 'Thriller', 145, '2026-03-15', 'https://placehold.co/300x450/2d1b69/e23744?text=Jawan+2', 'https://www.youtube.com/embed/COv52Qyctws', 'Shah Rukh Khan, Nayanthara, Vijay Sethupathi, Deepika Padukone', 8.1),
+('RRR: Rise Again', 'The legendary duo returns in an epic tale set during India''s fight for independence.', 'Telugu', 'Drama', 180, '2026-01-26', 'https://placehold.co/300x450/0d3b66/ff6b81?text=RRR+Rise', 'https://www.youtube.com/embed/f_vbAtFSEc0', 'N. T. Rama Rao Jr., Ram Charan, Ajay Devgn, Alia Bhatt', 8.8),
+('Inception 2: Dreamscape', 'Cobb is pulled back into the dream world for one final impossible mission.', 'English', 'Sci-Fi', 158, '2026-03-20', 'https://placehold.co/300x450/1a1a2e/3498db?text=Inception+2', 'https://www.youtube.com/embed/YoHD9XEInc0', 'Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page, Tom Hardy', 8.9),
+('Stree 3', 'The small town faces a new supernatural threat, bigger and funnier than ever before.', 'Hindi', 'Horror Comedy', 135, '2026-02-28', 'https://placehold.co/300x450/1a1a2e/2ecc71?text=Stree+3', 'https://www.youtube.com/embed/cVYYtH7NR50', 'Rajkummar Rao, Shraddha Kapoor, Pankaj Tripathi', 7.8),
+('KGF Chapter 3', 'Rocky Bhai''s legacy is put to the ultimate test in this final chapter of the KGF saga.', 'Kannada', 'Action', 170, '2026-04-01', 'https://placehold.co/300x450/1a1a2e/f39c12?text=KGF+3', 'https://www.youtube.com/embed/P33uBY2Glkg', 'Yash, Sanjay Dutt, Srinidhi Shetty, Raveena Tandon', 8.6),
+('Animal Park', 'A troubled son navigates the dark world of his father''s criminal empire.', 'Hindi', 'Crime', 155, '2026-03-10', 'https://placehold.co/300x450/1a1a2e/e74c3c?text=Animal+Park', 'https://www.youtube.com/embed/Q1NKMPhP8PY', 'Ranbir Kapoor, Anil Kapoor, Bobby Deol, Rashmika Mandanna', 8.0);
 
 -- 3. CINEMAS (linked to cities)
 INSERT INTO cinemas (name, address, city_id, created_at, updated_at) VALUES

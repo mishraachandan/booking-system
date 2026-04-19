@@ -35,4 +35,20 @@ public class Movie {
 
     @Column(name = "poster_url", length = 512)
     private String posterUrl;
+
+    /** YouTube (or other) trailer URL, surfaced on the movie detail page. */
+    @Column(name = "trailer_url", length = 512)
+    private String trailerUrl;
+
+    /**
+     * Comma-separated list of cast members. A denormalised string is
+     * deliberate: keeps the schema simple and the detail UI treats it as
+     * "Actor A, Actor B, Actor C".
+     */
+    @Column(name = "cast_members", columnDefinition = "TEXT")
+    private String castMembers;
+
+    /** Aggregate rating on a 0.0-10.0 scale. Nullable for new releases. */
+    @Column(precision = 3, scale = 1)
+    private java.math.BigDecimal rating;
 }

@@ -91,6 +91,9 @@ public class SecurityConfig {
                         // Public read-only data
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/shows/**",
+                                "/api/v1/movies/**",
+                                "/api/v1/addons/**",
+                                "/api/v1/cities/**",
                                 "/api/cities/**",
                                 "/api/categories/**",
                                 "/api/cinemas/**"
