@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { BookingAddOnLine, BookingAddOnResponse } from './addon.service';
 
 export interface BookingResponse {
   bookingId: number;
@@ -30,6 +31,12 @@ export interface BookingResponse {
   // Resource info
   resourceId: number | null;
   resourceName: string | null;
+
+  // Totals + add-ons (nullable for legacy bookings)
+  seatTotal?: number;
+  addOnTotal?: number;
+  grandTotal?: number;
+  addOns?: BookingAddOnResponse[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -38,8 +45,15 @@ export class BookingService {
 
   constructor(private http: HttpClient) {}
 
-  bookShowSeats(showId: number, showSeatIds: number[], notes?: string): Observable<BookingResponse> {
-    return this.http.post<BookingResponse>(`${this.baseUrl}/show-seats`, { showId, showSeatIds, notes });
+  bookShowSeats(
+    showId: number,
+    showSeatIds: number[],
+    notes?: string,
+    addOns?: BookingAddOnLine[]
+  ): Observable<BookingResponse> {
+    return this.http.post<BookingResponse>(`${this.baseUrl}/show-seats`, {
+      showId, showSeatIds, notes, addOns
+    });
   }
 
   confirmBooking(bookingId: number): Observable<BookingResponse> {

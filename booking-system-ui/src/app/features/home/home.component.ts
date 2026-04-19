@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { ShowService, Show, Movie } from '../../core/services/show.service';
 import { CityService, City } from '../../core/services/city.service';
 import { FormsModule } from '@angular/forms';
@@ -281,7 +282,8 @@ export class HomeComponent implements OnInit {
 
   constructor(
     private showService: ShowService,
-    private cityService: CityService
+    private cityService: CityService,
+    private router: Router
   ) {}
 
   ngOnInit() {
@@ -325,9 +327,8 @@ export class HomeComponent implements OnInit {
       this.cityWarning = true;
       return;
     }
-    this.selectedMovie = movie;
-    // Filter shows for this movie that belong to the selected city
-    this.movieShows = this.shows.filter(s => s.movie?.id === movie.id);
-    setTimeout(() => document.getElementById('shows')?.scrollIntoView({ behavior: 'smooth' }), 100);
+    // Primary UX: navigate to the movie detail page. Detail page lists
+    // showtimes and lets the user jump into seat selection.
+    this.router.navigate(['/movies', movie.id]);
   }
 }

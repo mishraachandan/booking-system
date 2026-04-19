@@ -1,7 +1,10 @@
 package com.mishraachandan.booking_system.dto.pojo;
 
 import com.mishraachandan.booking_system.dto.status.BookingStatus;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Flat DTO for Booking responses — avoids Hibernate proxy / circular reference issues.
@@ -35,6 +38,12 @@ public class BookingResponse {
     // Resource info (null for show-based bookings)
     private Long resourceId;
     private String resourceName;
+
+    // Seat / add-on totals + attached add-ons
+    private BigDecimal seatTotal;
+    private BigDecimal addOnTotal;
+    private BigDecimal grandTotal;
+    private List<BookingAddOnResponse> addOns = Collections.emptyList();
 
     public BookingResponse() {}
 
@@ -133,4 +142,15 @@ public class BookingResponse {
     public LocalDateTime getShowStartTime() { return showStartTime; }
     public Long getResourceId() { return resourceId; }
     public String getResourceName() { return resourceName; }
+
+    public BigDecimal getSeatTotal() { return seatTotal; }
+    public void setSeatTotal(BigDecimal seatTotal) { this.seatTotal = seatTotal; }
+    public BigDecimal getAddOnTotal() { return addOnTotal; }
+    public void setAddOnTotal(BigDecimal addOnTotal) { this.addOnTotal = addOnTotal; }
+    public BigDecimal getGrandTotal() { return grandTotal; }
+    public void setGrandTotal(BigDecimal grandTotal) { this.grandTotal = grandTotal; }
+    public List<BookingAddOnResponse> getAddOns() { return addOns; }
+    public void setAddOns(List<BookingAddOnResponse> addOns) {
+        this.addOns = addOns != null ? addOns : Collections.emptyList();
+    }
 }
