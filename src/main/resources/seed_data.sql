@@ -139,17 +139,3 @@ UNION ALL SELECT 'screens', COUNT(*) FROM screens
 UNION ALL SELECT 'seats', COUNT(*) FROM seats
 UNION ALL SELECT 'shows', COUNT(*) FROM shows
 UNION ALL SELECT 'show_seats', COUNT(*) FROM show_seats;
-
-
--- 8. ADD-ONS
-INSERT INTO add_ons (name, description, category, price, image_url, available, created_at, updated_at) VALUES
-('Popcorn (Large)', 'Freshly popped buttery perfection', 'FOOD', 250.00, 'https://placehold.co/100x100/1a1a2e/f1c40f?text=Popcorn', true, NOW(), NOW()),
-('Nachos with Salsa', 'Crispy nachos with tangy salsa and cheese', 'FOOD', 180.00, 'https://placehold.co/100x100/1a1a2e/f39c12?text=Nachos', true, NOW(), NOW()),
-('Samosa (2 pcs)', 'Hot and crispy potato stuffed samosas', 'FOOD', 90.00, 'https://placehold.co/100x100/1a1a2e/e67e22?text=Samosa', true, NOW(), NOW()),
-('Pepsi (Large)', 'Chilled Pepsi 500ml', 'BEVERAGE', 150.00, 'https://placehold.co/100x100/1a1a2e/3498db?text=Pepsi', true, NOW(), NOW()),
-('Cold Coffee', 'Thick creamy cold coffee', 'BEVERAGE', 200.00, 'https://placehold.co/100x100/1a1a2e/8e44ad?text=Coffee', true, NOW(), NOW()),
-('Couple Combo', '2 Large Popcorn + 2 Pepsi', 'COMBO', 650.00, 'https://placehold.co/100x100/1a1a2e/e74c3c?text=Combo+1', true, NOW(), NOW()),
-('Snack Combo', '1 Nachos + 1 Samosa + 2 Pepsi', 'COMBO', 450.00, 'https://placehold.co/100x100/1a1a2e/e74c3c?text=Combo+2', true, NOW(), NOW()),
-('Family Combo', '3 Large Popcorn + 4 Pepsi + 2 Nachos', 'COMBO', 1200.00, 'https://placehold.co/100x100/1a1a2e/e74c3c?text=Combo+3', true, NOW(), NOW())
-ON CONFLICT DO NOTHING;
-
