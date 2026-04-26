@@ -108,6 +108,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/payments/**").authenticated()
                         // Creating shows — require ADMIN role
                         .requestMatchers(HttpMethod.POST, "/api/v1/shows").hasRole("ADMIN")
+                        // Admin analytics + dynamic-pricing management — ADMIN only
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // Everything else — authenticated
                         .anyRequest().authenticated()
                 )

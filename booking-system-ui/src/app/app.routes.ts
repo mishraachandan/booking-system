@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './guards/auth.guard';
+import { authGuard, adminGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', loadComponent: () => import('./features/home/home.component').then(m => m.HomeComponent) },
@@ -23,6 +23,22 @@ export const routes: Routes = [
     path: 'my-bookings',
     loadComponent: () => import('./features/my-bookings/my-bookings.component').then(m => m.MyBookingsComponent),
     canActivate: [authGuard]
+  },
+  {
+    path: 'admin',
+    loadComponent: () => import('./features/admin/admin-layout.component').then(m => m.AdminLayoutComponent),
+    canActivate: [adminGuard],
+    children: [
+      { path: '', redirectTo: 'analytics', pathMatch: 'full' },
+      {
+        path: 'analytics',
+        loadComponent: () => import('./features/admin/analytics-dashboard.component').then(m => m.AnalyticsDashboardComponent)
+      },
+      {
+        path: 'pricing',
+        loadComponent: () => import('./features/admin/pricing-rules.component').then(m => m.PricingRulesComponent)
+      }
+    ]
   },
   { path: '**', redirectTo: '' }
 ];
