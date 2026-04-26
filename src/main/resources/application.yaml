@@ -48,6 +48,15 @@ razorpay:
   key-id: ${RAZORPAY_KEY_ID:RAZORPAY_KEY_NOT_SET}
   key-secret: ${RAZORPAY_KEY_SECRET:RAZORPAY_SECRET_NOT_SET}
 
+# ── Dynamic Pricing ───────────────────────────────────────────────────────────
+# When disabled (default), the pricing pipeline is a pass-through: seat totals
+# equal the base ShowSeat.price and the booking flow is byte-identical to the
+# pre-dynamic-pricing behaviour. Flip to `true` only after pricing rules have
+# been reviewed in the admin dashboard (/admin/pricing).
+pricing:
+  dynamic:
+    enabled: ${PRICING_DYNAMIC_ENABLED:false}
+
 # ── Keycloak Admin & Migration ────────────────────────────────────────────────
 keycloak:
   admin:

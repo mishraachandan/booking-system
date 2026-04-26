@@ -19,6 +19,9 @@ import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
           @if (isLoggedIn) {
             <span class="user-greeting">👤 {{ firstName }}</span>
             <a routerLink="/my-bookings" class="nav-link">My Bookings</a>
+            @if (isAdmin) {
+              <a routerLink="/admin" class="nav-link admin-link">⚙️ Admin</a>
+            }
             <button class="btn btn-ghost" (click)="logout()">Logout</button>
           } @else {
             <a routerLink="/login" class="btn btn-outline">Sign In</a>
@@ -80,6 +83,7 @@ import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
 })
 export class NavbarComponent {
   isLoggedIn = false;
+  isAdmin = false;
   firstName = '';
 
   private readonly authService = inject(AuthService);
@@ -96,6 +100,9 @@ export class NavbarComponent {
         this.isLoggedIn = this.authService.isLoggedIn();
         if (this.isLoggedIn) {
           this.firstName = this.authService.getFirstName();
+          this.isAdmin = this.authService.isAdmin();
+        } else {
+          this.isAdmin = false;
         }
       }
     });

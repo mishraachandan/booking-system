@@ -12,6 +12,7 @@ import com.mishraachandan.booking_system.dto.entity.User;
 import com.mishraachandan.booking_system.dto.pojo.BookingAddOnLine;
 import com.mishraachandan.booking_system.dto.pojo.BookingRequest;
 import com.mishraachandan.booking_system.dto.pojo.BookingResponse;
+import com.mishraachandan.booking_system.dto.pojo.PriceBreakdown;
 import com.mishraachandan.booking_system.dto.pojo.ShowSeatBookingRequest;
 import com.mishraachandan.booking_system.repository.AddOnRepository;
 import com.mishraachandan.booking_system.repository.BookableResourceRepository;
@@ -47,6 +48,7 @@ public class BookingService {
     private final ShowSeatRepository showSeatRepository;
     private final AddOnRepository addOnRepository;
     private final BookingAddOnRepository bookingAddOnRepository;
+    private final PricingService pricingService;
 
     public BookingService(BookingRepository bookingRepository,
             BookableResourceRepository resourceRepository,
@@ -54,7 +56,8 @@ public class BookingService {
             ShowRepository showRepository,
             ShowSeatRepository showSeatRepository,
             AddOnRepository addOnRepository,
-            BookingAddOnRepository bookingAddOnRepository) {
+            BookingAddOnRepository bookingAddOnRepository,
+            PricingService pricingService) {
         this.bookingRepository = bookingRepository;
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
@@ -62,6 +65,7 @@ public class BookingService {
         this.showSeatRepository = showSeatRepository;
         this.addOnRepository = addOnRepository;
         this.bookingAddOnRepository = bookingAddOnRepository;
+        this.pricingService = pricingService;
     }
 
     // ─── Generic Booking ─────────────────────────────────────────────────────────
@@ -153,6 +157,28 @@ public class BookingService {
                         "Seat " + ss.getSeat().getSeatNumber() + " must be locked before booking. Please lock it first.");
             }
             totalPrice = totalPrice.add(ss.getPrice());
+        }
+
+        // ── Dynamic Pricing ───────────────────────────────────────────────────
+        // When the feature flag is OFF or no rules are active, this block is a
+        // pass-through: each seat keeps its base price and totalPrice is
+        // unchanged. With the flag ON, we rewrite each booked seat's stored
+        // price to the effective price so that PaymentService.calculateBooking-
+        // Amount (which sums ShowSeat.price) automatically picks up the adjusted
+        // amount. This keeps dynamic pricing additive — no schema change, no
+        // extra column, no second source of truth.
+        BigDecimal pricedTotal = BigDecimal.ZERO;
+        LocalDateTime now = LocalDateTime.now();
+        for (ShowSeat ss : showSeats) {
+            PriceBreakdown pb = pricingService.resolve(ss.getPrice(), show.getStartTime(), now);
+            if (pb != null && pb.getEffective() != null && pb.getEffective().compareTo(ss.getPrice()) != 0) {
+                ss.setPrice(pb.getEffective());
+            }
+            pricedTotal = pricedTotal.add(ss.getPrice());
+        }
+        if (pricedTotal.compareTo(totalPrice) != 0) {
+            logger.info("Dynamic pricing: base ₹{} → effective ₹{}", totalPrice, pricedTotal);
+            totalPrice = pricedTotal;
         }
 
         // Create the booking first so we have an ID to link to ShowSeats
