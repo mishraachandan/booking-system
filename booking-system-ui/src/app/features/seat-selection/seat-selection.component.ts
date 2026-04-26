@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ShowService, ShowSeatResponse } from '../../core/services/show.service';
 import { BookingService } from '../../core/services/booking.service';
+import { AddOnService, AddOn, BookingAddOnLine } from '../../core/services/addon.service';
 
 @Component({
   selector: 'app-seat-selection',
@@ -76,6 +77,60 @@ import { BookingService } from '../../core/services/booking.service';
           }
         </div>
 
+        <!-- Add-ons picker -->
+        @if (selectedSeats.length > 0 && addOns.length > 0) {
+          <div class="addons-section">
+            <div class="addons-head" (click)="addOnsOpen = !addOnsOpen">
+              <div>
+                <h2>🍿 Add food &amp; beverages</h2>
+                <p class="sub">
+                  @if (addOnItems > 0) {
+                    {{ addOnItems }} item(s) selected · ₹{{ addOnTotal }}
+                  } @else {
+                    Optional · snacks, drinks and combos
+                  }
+                </p>
+              </div>
+              <span class="chev" [class.open]="addOnsOpen">▾</span>
+            </div>
+
+            @if (addOnsOpen) {
+              <div class="addons-grid">
+                @for (addOn of addOns; track addOn.id) {
+                  <div class="addon-card">
+                    <div class="addon-image-wrap">
+                      <img [src]="addOn.imageUrl" [alt]="addOn.name" class="addon-image" />
+                      <span class="addon-chip" [class]="addOn.category.toLowerCase()">
+                        {{ addOn.category }}
+                      </span>
+                    </div>
+                    <div class="addon-body">
+                      <div class="addon-name">{{ addOn.name }}</div>
+                      <div class="addon-desc">{{ addOn.description }}</div>
+                      <div class="addon-footer">
+                        <span class="addon-price">₹{{ addOn.price }}</span>
+                        <div class="qty-stepper">
+                          <button
+                            class="qty-btn"
+                            (click)="decrementAddOn(addOn)"
+                            [disabled]="(addOnQuantities[addOn.id] || 0) === 0"
+                            aria-label="Decrease">−</button>
+                          <span class="qty-val">{{ addOnQuantities[addOn.id] || 0 }}</span>
+                          <button
+                            class="qty-btn"
+                            (click)="incrementAddOn(addOn)"
+                            [disabled]="(addOnQuantities[addOn.id] || 0) >= 20"
+                            aria-label="Increase">+</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
         @if (bookingError) {
           <div class="error-msg" style="text-align:center;margin-top:16px;">{{ bookingError }}</div>
         }
@@ -85,8 +140,10 @@ import { BookingService } from '../../core/services/booking.service';
       @if (selectedSeats.length > 0 && !loading) {
         <div class="summary-bar">
           <div class="summary-info">
-            <span class="seat-count">{{ selectedSeats.length }} seat(s) selected</span>
-            <span class="total-price">₹{{ totalPrice }}</span>
+            <span class="seat-count">
+              {{ selectedSeats.length }} seat(s){{ addOnItems > 0 ? ' · ' + addOnItems + ' add-on(s)' : '' }}
+            </span>
+            <span class="total-price">₹{{ grandTotal }}</span>
           </div>
           <button class="btn btn-primary" (click)="proceedToBooking()" [disabled]="bookingLoading">
             {{ bookingLoading ? 'Booking...' : 'Book Now →' }}
@@ -250,6 +307,70 @@ import { BookingService } from '../../core/services/booking.service';
       .show-info-bar { flex-direction: column; gap: 12px; }
       .summary-bar { padding: 14px 16px; }
     }
+
+    /* Add-ons picker */
+    .addons-section {
+      margin-top: 32px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .addons-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 20px; cursor: pointer;
+      h2 { font-size: 16px; font-weight: 700; margin: 0; }
+      .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+      &:hover { background: var(--bg-secondary); }
+    }
+    .chev {
+      font-size: 20px; color: var(--text-muted);
+      transition: transform 0.2s;
+      &.open { transform: rotate(180deg); }
+    }
+    .addons-grid {
+      padding: 16px 20px 20px;
+      display: grid; gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      border-top: 1px solid var(--border);
+    }
+    .addon-card {
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .addon-image-wrap { position: relative; aspect-ratio: 4 / 3; background: #0a0b14; }
+    .addon-image { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .addon-chip {
+      position: absolute; top: 8px; left: 8px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+      padding: 3px 8px; border-radius: 10px; text-transform: uppercase;
+      &.food { background: rgba(230, 126, 34, 0.9); color: white; }
+      &.beverage { background: rgba(52, 152, 219, 0.9); color: white; }
+      &.combo { background: rgba(226, 55, 68, 0.9); color: white; }
+    }
+    .addon-body {
+      flex: 1; padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .addon-name { font-weight: 600; font-size: 14px; }
+    .addon-desc { font-size: 12px; color: var(--text-muted); flex: 1; line-height: 1.4; }
+    .addon-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 4px;
+    }
+    .addon-price { font-weight: 700; color: var(--accent); }
+    .qty-stepper {
+      display: inline-flex; align-items: center;
+      border: 1px solid var(--border); border-radius: 999px;
+      background: var(--bg-card);
+    }
+    .qty-btn {
+      width: 28px; height: 28px; border: none; background: none;
+      color: var(--text-primary); font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      &:disabled { opacity: 0.35; cursor: not-allowed; }
+      &:hover:not(:disabled) { color: var(--accent); }
+    }
+    .qty-val { min-width: 20px; text-align: center; font-weight: 600; font-size: 13px; }
   `]
 })
 export class SeatSelectionComponent implements OnInit, OnDestroy {
@@ -264,22 +385,59 @@ export class SeatSelectionComponent implements OnInit, OnDestroy {
   lockTimer = 0;
   private timerInterval: any;
 
+  // Add-ons state
+  addOns: AddOn[] = [];
+  addOnQuantities: Record<number, number> = {};
+  addOnsOpen = false;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private showService: ShowService,
-    private bookingService: BookingService
+    private bookingService: BookingService,
+    private addOnService: AddOnService
   ) {}
 
   get totalPrice(): number {
     return this.selectedSeats.reduce((sum, s) => sum + Number(s.price), 0);
   }
+  get addOnTotal(): number {
+    return this.addOns.reduce((sum, a) => {
+      const qty = this.addOnQuantities[a.id] || 0;
+      return sum + Number(a.price) * qty;
+    }, 0);
+  }
+  get addOnItems(): number {
+    return Object.values(this.addOnQuantities).reduce((a, b) => a + (b || 0), 0);
+  }
+  get grandTotal(): number { return this.totalPrice + this.addOnTotal; }
+
   get lockMinutes(): string { return String(Math.floor(this.lockTimer / 60)).padStart(2, '0'); }
   get lockSeconds(): string { return String(this.lockTimer % 60).padStart(2, '0'); }
 
   ngOnInit() {
     this.showId = Number(this.route.snapshot.paramMap.get('showId'));
     this.loadSeats();
+    this.addOnService.getAvailableAddOns().subscribe({
+      next: (items) => { this.addOns = items; },
+      error: () => { this.addOns = []; }
+    });
+  }
+
+  incrementAddOn(a: AddOn) {
+    const cur = this.addOnQuantities[a.id] || 0;
+    if (cur < 20) this.addOnQuantities[a.id] = cur + 1;
+  }
+
+  decrementAddOn(a: AddOn) {
+    const cur = this.addOnQuantities[a.id] || 0;
+    if (cur > 0) this.addOnQuantities[a.id] = cur - 1;
+  }
+
+  private collectAddOnLines(): BookingAddOnLine[] {
+    return Object.entries(this.addOnQuantities)
+      .filter(([, qty]) => (qty || 0) > 0)
+      .map(([id, qty]) => ({ addOnId: Number(id), quantity: qty as number }));
   }
 
   ngOnDestroy() { clearInterval(this.timerInterval); }
@@ -329,15 +487,22 @@ export class SeatSelectionComponent implements OnInit, OnDestroy {
     this.bookingLoading = true;
     this.bookingError = '';
     const seatIds = this.selectedSeats.map(s => s.showSeatId);
+    const addOnLines = this.collectAddOnLines();
 
     this.showService.lockSeats(this.showId, seatIds).subscribe({
       next: (res) => {
         if (res.success) {
           this.startTimer(8 * 60);
-          this.bookingService.bookShowSeats(this.showId, seatIds).subscribe({
+          this.bookingService.bookShowSeats(this.showId, seatIds, undefined, addOnLines).subscribe({
             next: (booking) => {
               this.router.navigate(['/booking/summary'], {
-                queryParams: { bookingId: booking.bookingId, total: this.totalPrice }
+                queryParams: {
+                  bookingId: booking.bookingId,
+                  total: this.grandTotal,
+                  seatTotal: this.totalPrice,
+                  addOnTotal: this.addOnTotal,
+                  seats: this.selectedSeats.length
+                }
               });
             },
             error: (err) => {

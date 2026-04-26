@@ -52,8 +52,14 @@ declare const Razorpay: any;
               </div>
               <div class="detail-row">
                 <span>Seats</span>
-                <span>{{ seats }} seat{{ seats !== 1 ? 's' : '' }}</span>
+                <span>{{ seats }} seat{{ seats !== 1 ? 's' : '' }} · ₹{{ seatTotal }}</span>
               </div>
+              @if (addOnTotal > 0) {
+                <div class="detail-row">
+                  <span>Add-ons 🍿</span>
+                  <span>₹{{ addOnTotal }}</span>
+                </div>
+              }
               <div class="detail-row total-row">
                 <span>Total Amount</span>
                 <span class="price">₹{{ total }}</span>
@@ -163,6 +169,8 @@ declare const Razorpay: any;
 export class BookingSummaryComponent implements OnInit {
   bookingId = 0;
   total = 0;
+  seatTotal = 0;
+  addOnTotal = 0;
   seats = 0;
   confirmed = false;
   paymentCancelled = false;
@@ -176,9 +184,12 @@ export class BookingSummaryComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.bookingId = Number(this.route.snapshot.queryParamMap.get('bookingId'));
-    this.total = Number(this.route.snapshot.queryParamMap.get('total'));
-    this.seats = Number(this.route.snapshot.queryParamMap.get('seats') || '1');
+    const qp = this.route.snapshot.queryParamMap;
+    this.bookingId = Number(qp.get('bookingId'));
+    this.total = Number(qp.get('total'));
+    this.seats = Number(qp.get('seats') || '1');
+    this.seatTotal = Number(qp.get('seatTotal') || this.total);
+    this.addOnTotal = Number(qp.get('addOnTotal') || 0);
   }
 
   /**

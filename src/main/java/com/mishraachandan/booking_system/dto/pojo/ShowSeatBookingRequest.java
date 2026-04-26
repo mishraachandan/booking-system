@@ -1,5 +1,6 @@
 package com.mishraachandan.booking_system.dto.pojo;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -23,4 +24,13 @@ public class ShowSeatBookingRequest {
     private List<Long> showSeatIds;
 
     private String notes;
+
+    /**
+     * Optional list of food/beverage/combo add-ons to attach to this booking.
+     * Sizes and per-line quantities are validated by {@link BookingAddOnLine}
+     * and the {@code @Size} cap below.
+     */
+    @Valid
+    @Size(max = 20, message = "You can attach at most 20 add-on line items")
+    private List<BookingAddOnLine> addOns;
 }

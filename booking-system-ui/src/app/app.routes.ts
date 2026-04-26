@@ -6,6 +6,10 @@ export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./features/auth/login/login.component').then(m => m.LoginComponent) },
   { path: 'register', loadComponent: () => import('./features/auth/register/register.component').then(m => m.RegisterComponent) },
   {
+    path: 'movies/:movieId',
+    loadComponent: () => import('./features/movie-detail/movie-detail.component').then(m => m.MovieDetailComponent)
+  },
+  {
     path: 'show/:showId/seats',
     loadComponent: () => import('./features/seat-selection/seat-selection.component').then(m => m.SeatSelectionComponent),
     canActivate: [authGuard]
