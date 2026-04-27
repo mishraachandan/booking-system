@@ -263,7 +263,7 @@ export class AnalyticsDashboardComponent implements OnInit {
       byCinema: this.analytics.revenueByCinema(range),
       byMovie: this.analytics.revenueByMovie(range),
       topShows: this.analytics.topShows(range, 10),
-      occupancy: this.analytics.occupancy()
+      occupancy: this.analytics.occupancy(range)
     }).subscribe({
       next: r => {
         this.overview.set(r.overview);
