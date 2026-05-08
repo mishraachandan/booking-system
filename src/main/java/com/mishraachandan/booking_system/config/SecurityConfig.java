@@ -1,6 +1,7 @@
 package com.mishraachandan.booking_system.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,8 +21,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
+    @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:http://localhost:8180/realms/booking-system}")
     private String keycloakIssuerUri;
+
+    @Value("${keycloak.enabled:false}")
+    private boolean keycloakEnabled;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final KeycloakJwtConverter keycloakJwtConverter;
@@ -39,9 +43,11 @@ public class SecurityConfig {
 
     /**
      * Keycloak JWT decoder — validates Keycloak-issued tokens via JWKS endpoint.
-     * Spring auto-discovers the JWKS URI from Keycloak's OpenID Connect discovery doc.
+     * Only created when keycloak.enabled=true (i.e. Keycloak is actually running).
+     * When disabled, the custom JJWT filter handles all authentication.
      */
     @Bean
+    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = false)
     public JwtDecoder jwtDecoder() {
         return NimbusJwtDecoder
                 .withIssuerLocation(keycloakIssuerUri)
@@ -114,14 +120,16 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 // ── Dual JWT support ───────────────────────────────────────────────────
-                // 1. Keycloak tokens (RS256, JWKS): handled by OAuth2 Resource Server
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakJwtConverter))
-                )
-                // 2. Legacy custom JJWT tokens (HS384): handled by JwtAuthenticationFilter
-                //    This runs BEFORE the OAuth2 resource server so if a custom token is
-                //    valid it sets the context and Keycloak validation is skipped.
+                // Custom JJWT filter (HS256) always runs — handles legacy tokens from /api/auth/login.
+                // Keycloak OAuth2 resource server only added when keycloak.enabled=true.
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        // Only wire Keycloak OAuth2 resource server when Keycloak is enabled
+        if (keycloakEnabled) {
+            http.oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakJwtConverter))
+            );
+        }
 
         return http.build();
     }

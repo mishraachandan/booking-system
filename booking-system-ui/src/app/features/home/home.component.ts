@@ -6,6 +6,9 @@ import { ShowService, Show, Movie } from '../../core/services/show.service';
 import { CityService, City } from '../../core/services/city.service';
 import { FormsModule } from '@angular/forms';
 
+const CITY_ID_KEY = 'selectedCityId';
+const CITY_NAME_KEY = 'selectedCityName';
+
 @Component({
   selector: 'app-home',
   imports: [CommonModule, RouterLink, FormsModule],
@@ -287,8 +290,17 @@ export class HomeComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.cityService.getCities().subscribe(c => this.cities = c);
-    // Don't load shows until a city is selected
+    this.cityService.getCities().subscribe(c => {
+      this.cities = c;
+
+      // Restore previously selected city from localStorage
+      const savedCityId = Number(localStorage.getItem(CITY_ID_KEY)) || 0;
+      if (savedCityId > 0 && c.some(city => city.id === savedCityId)) {
+        this.selectedCityId = savedCityId;
+        this.cityWarning = false;
+        this.loadShows();
+      }
+    });
   }
 
   loadShows() {
@@ -314,9 +326,16 @@ export class HomeComponent implements OnInit {
     this.selectedMovie = null;
     this.movieShows = [];
     this.cityWarning = this.selectedCityId == 0;
+
     if (!this.cityWarning) {
+      // Persist the selection to localStorage
+      localStorage.setItem(CITY_ID_KEY, String(this.selectedCityId));
+      const cityName = this.cities.find(c => c.id === Number(this.selectedCityId))?.name || '';
+      localStorage.setItem(CITY_NAME_KEY, cityName);
       this.loadShows();
     } else {
+      localStorage.removeItem(CITY_ID_KEY);
+      localStorage.removeItem(CITY_NAME_KEY);
       this.shows = [];
       this.movies = [];
     }
