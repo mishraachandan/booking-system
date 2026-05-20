@@ -49,6 +49,8 @@ public class BookingService {
     private final AddOnRepository addOnRepository;
     private final BookingAddOnRepository bookingAddOnRepository;
     private final PricingService pricingService;
+    private final BookingEventProducer bookingEventProducer;
+    private final com.mishraachandan.booking_system.config.SeatWebSocketHandler seatWebSocketHandler;
 
     public BookingService(BookingRepository bookingRepository,
             BookableResourceRepository resourceRepository,
@@ -57,7 +59,9 @@ public class BookingService {
             ShowSeatRepository showSeatRepository,
             AddOnRepository addOnRepository,
             BookingAddOnRepository bookingAddOnRepository,
-            PricingService pricingService) {
+            PricingService pricingService,
+            BookingEventProducer bookingEventProducer,
+            com.mishraachandan.booking_system.config.SeatWebSocketHandler seatWebSocketHandler) {
         this.bookingRepository = bookingRepository;
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
@@ -66,6 +70,8 @@ public class BookingService {
         this.addOnRepository = addOnRepository;
         this.bookingAddOnRepository = bookingAddOnRepository;
         this.pricingService = pricingService;
+        this.bookingEventProducer = bookingEventProducer;
+        this.seatWebSocketHandler = seatWebSocketHandler;
     }
 
     // ─── Generic Booking ─────────────────────────────────────────────────────────
@@ -114,6 +120,7 @@ public class BookingService {
                 request.getResourceId());
 
         initializeBookingProxies(savedBooking);
+        bookingEventProducer.publishEvent(savedBooking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CONFIRMED);
         return savedBooking;
     }
 
@@ -199,6 +206,7 @@ public class BookingService {
             ss.setLockedAt(null);
             ss.setLockedByUserId(null);
             ss.setBookingId(savedBooking.getId());
+            seatWebSocketHandler.broadcastSeatStatus(show.getId(), ss.getId(), "BOOKED", null);
         }
         showSeatRepository.saveAll(showSeats);
 
@@ -212,6 +220,7 @@ public class BookingService {
                 savedBooking.getId(), userId, showSeats.size(), request.getShowId(), totalPrice, addOnTotal);
 
         initializeBookingProxies(savedBooking);
+        bookingEventProducer.publishEvent(savedBooking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CREATED);
         return savedBooking;
     }
 
@@ -265,6 +274,7 @@ public class BookingService {
         logger.info("Booking {} confirmed", bookingId);
         
         initializeBookingProxies(confirmed);
+        bookingEventProducer.publishEvent(confirmed, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CONFIRMED);
         return confirmed;
     }
 
@@ -295,8 +305,14 @@ public class BookingService {
      */
     @Transactional
     public void releaseSeatsForBooking(Long bookingId) {
+        List<ShowSeat> showSeats = showSeatRepository.findByBookingId(bookingId);
         int released = showSeatRepository.releaseByBookingId(bookingId);
         logger.info("Released {} seats for booking {}", released, bookingId);
+        for (ShowSeat ss : showSeats) {
+            if (ss.getShow() != null) {
+                seatWebSocketHandler.broadcastSeatStatus(ss.getShow().getId(), ss.getId(), "AVAILABLE", null);
+            }
+        }
     }
 
     // ─── Auto-Expiry Scheduled Task ───────────────────────────────────────────────
@@ -322,6 +338,7 @@ public class BookingService {
             booking.setStatus(BookingStatus.EXPIRED);
             bookingRepository.save(booking);
             logger.info("Booking {} expired and seats released", booking.getId());
+            bookingEventProducer.publishEvent(booking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.EXPIRED);
         }
     }
 
@@ -388,14 +405,33 @@ public class BookingService {
             throw new SecurityException("User not authorized to cancel this booking");
         }
 
-        // Release seats if booking was in AWAITING_PAYMENT
-        if (booking.getStatus() == BookingStatus.AWAITING_PAYMENT) {
+        BookingStatus oldStatus = booking.getStatus();
+
+        // Release seats if booking was in AWAITING_PAYMENT or CONFIRMED
+        if (oldStatus == BookingStatus.AWAITING_PAYMENT || oldStatus == BookingStatus.CONFIRMED) {
             releaseSeatsForBooking(bookingId);
+        }
+
+        // Calculate and log simulated refund for CONFIRMED bookings
+        if (oldStatus == BookingStatus.CONFIRMED) {
+            BigDecimal refundAmount = bookingRepository.findTotalAmountForBooking(bookingId)
+                    .orElse(BigDecimal.ZERO);
+            
+            List<com.mishraachandan.booking_system.dto.entity.BookingAddOn> addOns = 
+                    bookingAddOnRepository.findByBookingIdIn(List.of(bookingId));
+            BigDecimal addOnTotal = addOns.stream()
+                    .map(a -> a.getUnitPrice().multiply(BigDecimal.valueOf(a.getQuantity())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    
+            BigDecimal grandTotal = refundAmount.add(addOnTotal);
+            
+            logger.info("Simulating Razorpay refund of ₹{} for booking {} (NO actual refund triggered as Razorpay API keys are not configured)", grandTotal, bookingId);
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
         logger.info("Booking {} cancelled by user {}", bookingId, userId);
+        bookingEventProducer.publishEvent(booking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CANCELLED);
     }
 
     /**

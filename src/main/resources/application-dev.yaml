@@ -1,0 +1,33 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DEV profile  — runs WITHOUT Keycloak.
+#
+# Override the issuer-uri so Spring Security's OAuth2 resource server
+# does NOT try to contact Keycloak on startup (which causes ECONNREFUSED).
+# The JwtAuthenticationFilter (JJWT / HS256) still works normally for
+# any component that issues its own tokens via /api/auth/login.
+#
+# Usage:
+#   ./gradlew bootRun --args='--spring.profiles.active=dev'
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Point to a local no-op well-known URL so Spring does NOT call
+          # Keycloak. We override this with a JWK-set-uri instead so that
+          # the bean creation succeeds without a live Keycloak instance.
+          # In dev we skip Keycloak validation; our JJWT filter handles auth.
+          issuer-uri: ""
+          # Use a public key derived from our own HS256 secret — or simply
+          # disable by pointing to a dummy jwk-set-uri that we never reach.
+          jwk-set-uri: ""
+
+# Disable the Keycloak user-migration runner in dev
+keycloak:
+  migration:
+    enabled: false
+
+# Show SQL in dev for debugging
+spring.jpa.show-sql: true

@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ShowService, ShowSeatResponse } from '../../core/services/show.service';
 import { BookingService } from '../../core/services/booking.service';
 import { AddOnService, AddOn, BookingAddOnLine } from '../../core/services/addon.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-seat-selection',
@@ -384,6 +385,8 @@ export class SeatSelectionComponent implements OnInit, OnDestroy {
   showId = 0;
   lockTimer = 0;
   private timerInterval: any;
+  private ws: WebSocket | null = null;
+  currentUserId: number | null = null;
 
   // Add-ons state
   addOns: AddOn[] = [];
@@ -395,7 +398,8 @@ export class SeatSelectionComponent implements OnInit, OnDestroy {
     private router: Router,
     private showService: ShowService,
     private bookingService: BookingService,
-    private addOnService: AddOnService
+    private addOnService: AddOnService,
+    private authService: AuthService
   ) {}
 
   get totalPrice(): number {
@@ -417,11 +421,57 @@ export class SeatSelectionComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.showId = Number(this.route.snapshot.paramMap.get('showId'));
+    this.currentUserId = this.authService.getUserId();
     this.loadSeats();
     this.addOnService.getAvailableAddOns().subscribe({
       next: (items) => { this.addOns = items; },
       error: () => { this.addOns = []; }
     });
+    this.connectWebSocket();
+  }
+
+  connectWebSocket() {
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.host;
+      this.ws = new WebSocket(`${protocol}//${wsHost}/ws/seats`);
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && Number(data.showId) === this.showId) {
+            const seat = this.seats.find(s => s.showSeatId === Number(data.showSeatId));
+            if (seat) {
+              seat.status = data.status;
+
+              // If a seat becomes locked or booked by someone else and we had it selected, deselect it
+              if (data.status !== 'AVAILABLE' && this.isSelected(seat)) {
+                if (data.status === 'BOOKED' || (data.status === 'LOCKED' && data.lockedByUserId !== this.currentUserId)) {
+                  this.selectedSeats = this.selectedSeats.filter(s => s.showSeatId !== seat.showSeatId);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error parsing seat update WebSocket message:', e);
+        }
+      };
+
+      this.ws.onclose = () => {
+        console.log('Seat WebSocket connection closed. Reconnecting in 3s...');
+        setTimeout(() => {
+          if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+            this.connectWebSocket();
+          }
+        }, 3000);
+      };
+
+      this.ws.onerror = (err) => {
+        console.warn('Seat WebSocket error:', err);
+      };
+    } catch (e) {
+      console.warn('Could not establish WebSocket connection:', e);
+    }
   }
 
   incrementAddOn(a: AddOn) {
@@ -440,7 +490,12 @@ export class SeatSelectionComponent implements OnInit, OnDestroy {
       .map(([id, qty]) => ({ addOnId: Number(id), quantity: qty as number }));
   }
 
-  ngOnDestroy() { clearInterval(this.timerInterval); }
+  ngOnDestroy() {
+    clearInterval(this.timerInterval);
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
 
   loadSeats() {
     this.loading = true;

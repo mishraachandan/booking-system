@@ -53,6 +53,12 @@ dependencies {
 	implementation 'com.razorpay:razorpay-java:1.4.6'
 	// Keycloak — Spring OAuth2 Resource Server (validates Keycloak JWTs via JWKS)
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+	// Kafka
+	implementation 'org.springframework.kafka:spring-kafka'
+	// WebSockets
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	// Redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 }
 
 tasks.named('test') {

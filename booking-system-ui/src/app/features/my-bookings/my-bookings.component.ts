@@ -77,6 +77,17 @@ type Tab = 'upcoming' | 'past';
                       </ul>
                     </div>
                   }
+                  @if (booking.status === 'CONFIRMED') {
+                    <div class="qr-block">
+                      <div class="qr-header">🎟️ ENTRY TICKET QR</div>
+                      <div class="qr-container">
+                        <img [src]="'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=BOOKING-' + booking.bookingId" 
+                             alt="Check-in QR Code" 
+                             class="qr-image" />
+                        <div class="qr-caption">Scan at entry gate</div>
+                      </div>
+                    </div>
+                  }
                 </div>
                 <div class="booking-status">
                   <span class="status-badge" [class]="booking.status.toLowerCase()">
@@ -135,6 +146,30 @@ type Tab = 'upcoming' | 'past';
                 (click)="confirmCancel()"
                 [disabled]="!acceptedTc || cancelling">
                 {{ cancelling ? 'Cancelling...' : 'Yes, cancel booking' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Refund Notification Modal -->
+      @if (refundNotification) {
+        <div class="modal-backdrop" (click)="closeRefundNotification()">
+          <div class="modal-card success-card" (click)="$event.stopPropagation()">
+            <div class="success-icon">💰</div>
+            <h2>Refund Simulated Successfully!</h2>
+            <p class="modal-sub">Booking Cancellation Confirmed</p>
+
+            <div class="refund-detail-box">
+              <p>A simulated refund of <strong>₹{{ refundNotification.amount }}</strong> has been initiated to your original payment method.</p>
+              <div class="alert alert-info">
+                ℹ️ <strong>Mock Mode:</strong> The Razorpay API keys are not configured. The actual refund transaction has been mocked in the system.
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn btn-primary" (click)="closeRefundNotification()">
+                Okay, great!
               </button>
             </div>
           </div>
@@ -216,6 +251,42 @@ type Tab = 'upcoming' | 'past';
       .danger { color: var(--danger); &:hover { color: var(--danger); background: rgba(231, 76, 60, 0.1); } }
     }
 
+    .qr-block {
+      margin-top: 16px; padding-top: 16px;
+      border-top: 1px dashed var(--border);
+    }
+    .qr-header {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px;
+    }
+    .qr-container {
+      display: flex; flex-direction: column; align-items: center;
+      background: white; border-radius: 8px; padding: 12px;
+      width: fit-content; border: 1px solid var(--border);
+    }
+    .qr-image {
+      width: 120px; height: 120px; display: block;
+    }
+    .qr-caption {
+      margin-top: 6px; font-size: 11px; font-weight: 600;
+      color: #333; letter-spacing: 0.5px; text-transform: uppercase;
+    }
+
+    .success-card {
+      text-align: center;
+      .success-icon { font-size: 48px; margin-bottom: 12px; }
+      h2 { color: var(--success); }
+    }
+    .refund-detail-box {
+      font-size: 14px; line-height: 1.5; color: var(--text-secondary);
+      margin: 16px 0 24px;
+      .alert {
+        background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.2);
+        color: var(--text-primary); border-radius: var(--radius-sm);
+        padding: 10px 12px; margin-top: 14px; font-size: 13px; text-align: left;
+      }
+    }
+
     /* Modal */
     .modal-backdrop {
       position: fixed; inset: 0; z-index: 200;
@@ -264,6 +335,7 @@ export class MyBookingsComponent implements OnInit {
   acceptedTc = false;
   cancelling = false;
   cancelError = '';
+  refundNotification: { amount: number } | null = null;
 
   constructor(private bookingService: BookingService) {}
 
@@ -331,12 +403,18 @@ export class MyBookingsComponent implements OnInit {
     this.cancelling = true;
     this.cancelError = '';
     const id = this.cancelTarget.bookingId;
+    const isConfirmed = this.cancelTarget.status === 'CONFIRMED';
+    const refundVal = this.cancelTarget.grandTotal || 0;
+
     this.bookingService.cancelBooking(id).subscribe({
       next: () => {
         this.cancelling = false;
         this.cancelTarget = null;
         this.acceptedTc = false;
         this.loadBookings();
+        if (isConfirmed) {
+          this.refundNotification = { amount: refundVal };
+        }
       },
       error: (err) => {
         this.cancelling = false;
@@ -344,5 +422,9 @@ export class MyBookingsComponent implements OnInit {
           'Could not cancel booking. Please try again.';
       }
     });
+  }
+
+  closeRefundNotification() {
+    this.refundNotification = null;
   }
 }
