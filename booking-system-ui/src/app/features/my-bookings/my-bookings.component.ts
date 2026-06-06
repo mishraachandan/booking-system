@@ -13,8 +13,20 @@ type Tab = 'upcoming' | 'past';
     <div class="bookings-page page-enter container">
       <h1 class="page-title">My Bookings</h1>
 
-      <!-- Tabs -->
+      <!-- Search & Filters -->
       @if (!loading && bookings.length > 0) {
+        <div class="search-filters" style="margin-bottom: 24px;">
+          <div class="search-input-wrap" style="margin-bottom: 0;">
+            <span class="search-icon">🔍</span>
+            <input 
+              type="text" 
+              [(ngModel)]="bookingSearchTerm" 
+              placeholder="Search bookings by movie name or booking ID..." 
+              aria-label="Search bookings" />
+          </div>
+        </div>
+
+        <!-- Tabs -->
         <div class="tabs">
           <button
             class="tab"
@@ -40,29 +52,49 @@ type Tab = 'upcoming' | 'past';
           <a routerLink="/" class="btn btn-primary">Browse Shows</a>
         </div>
       } @else {
-        @if (visibleBookings.length === 0) {
+        @if (filteredVisibleBookings.length === 0) {
           <div class="empty-state small">
-            <p>No {{ activeTab === 'upcoming' ? 'upcoming' : 'past' }} bookings.</p>
+            <p>No matching {{ activeTab === 'upcoming' ? 'upcoming' : 'past' }} bookings found.</p>
           </div>
         }
         <div class="bookings-list">
-          @for (booking of visibleBookings; track booking.bookingId) {
-            <div class="card booking-card">
-              <div class="booking-main">
-                <div class="booking-info">
-                  <h3>{{ booking.movieTitle || booking.resourceName || 'Event Booking' }}</h3>
-                  <p class="meta">
-                    @if (booking.cinemaName) {
-                      {{ booking.cinemaName }} · {{ booking.screenName }}
-                    }
-                  </p>
-                  <p class="meta">{{ booking.showStartTime || booking.startTime | date:'MMM d, yyyy · hh:mm a' }}</p>
-                  <p class="tickets">
-                    {{ booking.numberOfTickets }} ticket{{ booking.numberOfTickets > 1 ? 's' : '' }}
-                    @if (booking.grandTotal != null) {
-                      · <strong>₹{{ booking.grandTotal }}</strong>
-                    }
-                  </p>
+          @for (booking of filteredVisibleBookings; track booking.bookingId) {
+            @if (booking.status === 'CONFIRMED') {
+              <!-- Premium Boarding Pass E-Ticket -->
+              <div [id]="'booking-card-' + booking.bookingId" class="boarding-pass booking-card">
+                <div class="ticket-header">
+                  <div class="ticket-logo">Book<span>My</span>Show</div>
+                  <div class="ticket-type">E-Ticket</div>
+                </div>
+                <div class="ticket-body">
+                  <div class="ticket-movie-title">{{ booking.movieTitle || booking.resourceName || 'Event Booking' }}</div>
+                  
+                  <div class="ticket-content-wrap" style="display: flex; gap: 24px; align-items: flex-start; justify-content: space-between;">
+                    <div class="ticket-grid" style="flex: 1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 0;">
+                      <div class="ticket-field">
+                        <label>Cinema / Venue</label>
+                        <span>{{ booking.cinemaName || 'Standard Screen' }}</span>
+                      </div>
+                      <div class="ticket-field">
+                        <label>Screen</label>
+                        <span>{{ booking.screenName || 'Screen 1' }}</span>
+                      </div>
+                      <div class="ticket-field">
+                        <label>Date &amp; Time</label>
+                        <span>{{ booking.showStartTime || booking.startTime | date:'MMM d, yyyy · hh:mm a' }}</span>
+                      </div>
+                      <div class="ticket-field">
+                        <label>Seats</label>
+                        <span>{{ booking.numberOfTickets }} ticket{{ booking.numberOfTickets > 1 ? 's' : '' }}</span>
+                      </div>
+                    </div>
+
+                    <div class="ticket-poster-wrap">
+                      <img [src]="getMoviePoster(booking.movieTitle || booking.resourceName)" 
+                           [alt]="booking.movieTitle || booking.resourceName" 
+                           class="ticket-poster" />
+                    </div>
+                  </div>
 
                   @if (booking.addOns && booking.addOns.length > 0) {
                     <div class="addons-block">
@@ -77,33 +109,84 @@ type Tab = 'upcoming' | 'past';
                       </ul>
                     </div>
                   }
-                  @if (booking.status === 'CONFIRMED') {
-                    <div class="qr-block">
-                      <div class="qr-header">🎟️ ENTRY TICKET QR</div>
-                      <div class="qr-container">
-                        <img [src]="'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=BOOKING-' + booking.bookingId" 
-                             alt="Check-in QR Code" 
-                             class="qr-image" />
-                        <div class="qr-caption">Scan at entry gate</div>
-                      </div>
-                    </div>
-                  }
                 </div>
-                <div class="booking-status">
-                  <span class="status-badge" [class]="booking.status.toLowerCase()">
-                    {{ booking.status | titlecase }}
-                  </span>
-                  <span class="booking-id">#{{ booking.bookingId }}</span>
+
+                <div class="ticket-divider"></div>
+
+                <div class="ticket-footer">
+                  <div class="qr-side">
+                    <img [src]="'https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=BOOKING-' + booking.bookingId" 
+                         alt="Check-in QR Code" />
+                  </div>
+                  <div class="barcode-side">
+                    <div class="barcode-stripes"></div>
+                    <span class="barcode-num">BMS{{ booking.bookingId }}</span>
+                  </div>
+                </div>
+
+                <div class="booking-actions" style="margin-top: 0; padding: 16px 28px; background: rgba(0,0,0,0.02); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                  <button class="btn btn-ghost" style="padding: 8px 12px; font-size: 13px;" (click)="shareBooking(booking)">
+                    🔗 Share Details
+                  </button>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-ghost danger" style="padding: 8px 12px; font-size: 13px;" *ngIf="canCancel(booking)" (click)="openCancelModal(booking)">
+                      Cancel
+                    </button>
+                    <button class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;" (click)="printTicket(booking)">
+                      🖨️ Print E-Ticket
+                    </button>
+                  </div>
                 </div>
               </div>
-              @if (canCancel(booking)) {
-                <div class="booking-actions">
-                  <button class="btn btn-ghost danger" (click)="openCancelModal(booking)">
-                    Cancel Booking
-                  </button>
+            } @else {
+              <!-- Standard Booking Card for non-confirmed states -->
+              <div class="card booking-card">
+                <div class="booking-main">
+                  <div class="booking-info">
+                    <h3>{{ booking.movieTitle || booking.resourceName || 'Event Booking' }}</h3>
+                    <p class="meta">
+                      @if (booking.cinemaName) {
+                        {{ booking.cinemaName }} · {{ booking.screenName }}
+                      }
+                    </p>
+                    <p class="meta">{{ booking.showStartTime || booking.startTime | date:'MMM d, yyyy · hh:mm a' }}</p>
+                    <p class="tickets">
+                      {{ booking.numberOfTickets }} ticket{{ booking.numberOfTickets > 1 ? 's' : '' }}
+                      @if (booking.grandTotal != null) {
+                        · <strong>₹{{ booking.grandTotal }}</strong>
+                      }
+                    </p>
+
+                    @if (booking.addOns && booking.addOns.length > 0) {
+                      <div class="addons-block">
+                        <div class="addons-header">🍿 Add-ons</div>
+                        <ul class="addons-list">
+                          @for (a of booking.addOns; track a.id) {
+                            <li>
+                              <span>{{ a.name }} × {{ a.quantity }}</span>
+                              <span class="addon-total">₹{{ a.lineTotal }}</span>
+                            </li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                  </div>
+                  <div class="booking-status">
+                    <span class="status-badge" [class]="booking.status.toLowerCase()">
+                      {{ booking.status | titlecase }}
+                    </span>
+                    <span class="booking-id">#{{ booking.bookingId }}</span>
+                  </div>
                 </div>
-              }
-            </div>
+                @if (canCancel(booking)) {
+                  <div class="booking-actions">
+                    <button class="btn btn-ghost danger" (click)="openCancelModal(booking)">
+                      Cancel Booking
+                    </button>
+                  </div>
+                }
+              </div>
+            }
           }
         </div>
       }
@@ -199,7 +282,7 @@ type Tab = 'upcoming' | 'past';
       padding: 2px 8px; border-radius: 10px;
       font-size: 11px; font-weight: 700;
     }
-    .tab.active .tab-count { background: rgba(226, 55, 68, 0.15); color: var(--accent); }
+    .tab.active .tab-count { background: rgba(244, 63, 94, 0.15); color: var(--accent); }
 
     .empty-state {
       text-align: center; padding: 80px 20px; color: var(--text-muted);
@@ -207,13 +290,13 @@ type Tab = 'upcoming' | 'past';
       p { margin-bottom: 24px; }
       &.small { padding: 40px 20px; }
     }
-    .bookings-list { display: flex; flex-direction: column; gap: 16px; }
+    .bookings-list { display: flex; flex-direction: column; gap: 24px; }
     .booking-card { padding: 24px; }
     .booking-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
     .booking-info {
       flex: 1; min-width: 0;
       h3 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-      .meta { font-size: 13px; color: var(--text-muted); margin-bottom: 2px; }
+      .meta { font-size: 13px; color: var(--text-secondary); margin-bottom: 2px; }
       .tickets { font-size: 14px; color: var(--text-secondary); margin-top: 8px; }
     }
     .addons-block {
@@ -238,38 +321,56 @@ type Tab = 'upcoming' | 'past';
     .status-badge {
       display: inline-block; padding: 4px 12px; border-radius: 20px;
       font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
-      &.confirmed { background: rgba(46, 204, 113, 0.15); color: var(--success); }
-      &.awaiting_payment { background: rgba(243, 156, 18, 0.15); color: var(--warning); }
-      &.cancelled { background: rgba(231, 76, 60, 0.15); color: var(--danger); }
-      &.pending { background: rgba(149, 165, 166, 0.15); color: var(--text-muted); }
-      &.expired { background: rgba(149, 165, 166, 0.15); color: var(--text-muted); }
-      &.completed { background: rgba(52, 152, 219, 0.15); color: #3498db; }
+      &.confirmed { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+      &.awaiting_payment { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+      &.cancelled { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+      &.pending { background: rgba(148, 163, 184, 0.15); color: var(--text-muted); }
+      &.expired { background: rgba(148, 163, 184, 0.15); color: var(--text-muted); }
+      &.completed { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
     }
     .booking-actions {
       border-top: 1px solid var(--border); margin-top: 16px; padding-top: 12px;
       text-align: right;
-      .danger { color: var(--danger); &:hover { color: var(--danger); background: rgba(231, 76, 60, 0.1); } }
+      .danger { color: var(--danger); &:hover { color: var(--danger); background: rgba(239, 68, 68, 0.1); } }
     }
 
-    .qr-block {
-      margin-top: 16px; padding-top: 16px;
-      border-top: 1px dashed var(--border);
+    .ticket-poster-wrap {
+      flex: 0 0 80px;
+      width: 80px;
+      aspect-ratio: 2/3;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      background: var(--bg-secondary);
+      transition: all 0.3s ease;
+      
+      &:hover {
+        transform: scale(1.05);
+        border-color: var(--accent);
+        box-shadow: 0 5px 15px var(--accent-glow);
+      }
     }
-    .qr-header {
-      font-size: 12px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px;
+    .ticket-poster {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
     }
-    .qr-container {
-      display: flex; flex-direction: column; align-items: center;
-      background: white; border-radius: 8px; padding: 12px;
-      width: fit-content; border: 1px solid var(--border);
+    .ticket-poster-wrap:hover .ticket-poster {
+      transform: scale(1.1);
     }
-    .qr-image {
-      width: 120px; height: 120px; display: block;
-    }
-    .qr-caption {
-      margin-top: 6px; font-size: 11px; font-weight: 600;
-      color: #333; letter-spacing: 0.5px; text-transform: uppercase;
+
+    @media (max-width: 600px) {
+      .ticket-content-wrap {
+        flex-direction: column-reverse;
+        gap: 16px;
+      }
+      .ticket-poster-wrap {
+        align-self: center;
+        width: 120px;
+        flex: 0 0 120px;
+      }
     }
 
     .success-card {
@@ -281,7 +382,7 @@ type Tab = 'upcoming' | 'past';
       font-size: 14px; line-height: 1.5; color: var(--text-secondary);
       margin: 16px 0 24px;
       .alert {
-        background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.2);
+        background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.15);
         color: var(--text-primary); border-radius: var(--radius-sm);
         padding: 10px 12px; margin-top: 14px; font-size: 13px; text-align: left;
       }
@@ -316,7 +417,7 @@ type Tab = 'upcoming' | 'past';
       input { margin-top: 2px; }
     }
     .error-msg {
-      background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3);
+      background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);
       color: var(--danger); padding: 10px; border-radius: var(--radius-sm);
       font-size: 13px; margin-bottom: 12px;
     }
@@ -331,11 +432,27 @@ export class MyBookingsComponent implements OnInit {
   loading = true;
   activeTab: Tab = 'upcoming';
 
+  bookingSearchTerm = '';
+
   cancelTarget: BookingResponse | null = null;
   acceptedTc = false;
   cancelling = false;
   cancelError = '';
   refundNotification: { amount: number } | null = null;
+
+  getMoviePoster(title: string | null): string {
+    if (!title) return 'https://placehold.co/300x450/1a1a2e/e23744?text=Movie';
+    const cleanTitle = title.trim();
+    if (cleanTitle.includes('Dark Knight')) return '/posters/the-dark-knight-returns.jpg';
+    if (cleanTitle.includes('Pushpa')) return '/posters/pushpa-3.jpg';
+    if (cleanTitle.includes('Jawan')) return '/posters/jawan-2.jpg';
+    if (cleanTitle.includes('RRR')) return '/posters/rrr-rise-again.jpg';
+    if (cleanTitle.includes('Inception')) return '/posters/inception-2.jpg';
+    if (cleanTitle.includes('Stree')) return '/posters/stree-3.jpg';
+    if (cleanTitle.includes('KGF') || cleanTitle.includes('K.G.F')) return '/posters/kgf-chapter-3.jpg';
+    if (cleanTitle.includes('Animal')) return '/posters/animal-park.jpg';
+    return `https://placehold.co/300x450/1a1a2e/e23744?text=${encodeURIComponent(cleanTitle)}`;
+  }
 
   constructor(private bookingService: BookingService) {}
 
@@ -377,6 +494,19 @@ export class MyBookingsComponent implements OnInit {
 
   get visibleBookings(): BookingResponse[] {
     return this.activeTab === 'upcoming' ? this.upcomingBookings : this.pastBookings;
+  }
+
+  get filteredVisibleBookings(): BookingResponse[] {
+    let list = this.visibleBookings;
+    if (this.bookingSearchTerm) {
+      const term = this.bookingSearchTerm.toLowerCase().trim();
+      list = list.filter(b => 
+        (b.movieTitle && b.movieTitle.toLowerCase().includes(term)) ||
+        (b.resourceName && b.resourceName.toLowerCase().includes(term)) ||
+        (String(b.bookingId).includes(term))
+      );
+    }
+    return list;
   }
 
   canCancel(b: BookingResponse): boolean {
@@ -426,5 +556,39 @@ export class MyBookingsComponent implements OnInit {
 
   closeRefundNotification() {
     this.refundNotification = null;
+  }
+
+  printTicket(booking: BookingResponse) {
+    const cardElement = document.getElementById(`booking-card-${booking.bookingId}`);
+    if (cardElement) {
+      cardElement.classList.add('printing-mode');
+      window.print();
+      setTimeout(() => {
+        cardElement.classList.remove('printing-mode');
+      }, 1000);
+    }
+  }
+
+  shareBooking(b: BookingResponse) {
+    const movie = b.movieTitle || b.resourceName || 'Movie';
+    const date = new Date(b.showStartTime || b.startTime || 0).toLocaleString();
+    const shareText = `Hey! I just booked tickets for "${movie}" on ${date}. Booking ID: #${b.bookingId}. See you there!`;
+    
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: 'Movie Ticket Booking',
+        text: shareText,
+        url: typeof window !== 'undefined' ? window.location.origin + '/my-bookings' : ''
+      }).catch(err => {
+        console.log('Share failed:', err);
+      });
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      // Fallback: Copy to clipboard
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('Booking details copied to clipboard!');
+      }).catch(err => {
+        console.error('Clipboard copy failed:', err);
+      });
+    }
   }
 }

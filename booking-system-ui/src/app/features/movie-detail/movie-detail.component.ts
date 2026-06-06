@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -23,8 +23,12 @@ import { ShowService, Show } from '../../core/services/show.service';
         <section class="hero-banner" [style.background-image]="'url(' + movie.posterUrl + ')'">
           <div class="hero-overlay"></div>
           <div class="container hero-content">
-            <div class="poster-wrap">
+            <div class="poster-wrap" (click)="openZoomModal()">
               <img [src]="movie.posterUrl || fallbackPoster" [alt]="movie.title" class="poster" />
+              <div class="poster-zoom-overlay">
+                <span class="zoom-icon">🔍</span>
+                <span>Click to Expand</span>
+              </div>
             </div>
             <div class="hero-info">
               <h1 class="title">{{ movie.title }}</h1>
@@ -46,7 +50,7 @@ import { ShowService, Show } from '../../core/services/show.service';
                 </button>
                 @if (trailerSafeUrl) {
                   <button class="btn btn-outline" (click)="toggleTrailer()">
-                    {{ trailerOpen ? '✕ Close Trailer' : '▶ Watch Trailer' }}
+                    ▶ Watch Trailer
                   </button>
                 }
               </div>
@@ -54,18 +58,40 @@ import { ShowService, Show } from '../../core/services/show.service';
           </div>
         </section>
 
-        <!-- Trailer -->
+        <!-- Trailer Lightbox Modal -->
         @if (trailerOpen && trailerSafeUrl) {
-          <section class="trailer-section container">
-            <div class="trailer-wrap">
+          <div class="lightbox-backdrop" (click)="toggleTrailer()">
+            <div class="lightbox-content" (click)="$event.stopPropagation()">
+              <button class="lightbox-close" (click)="toggleTrailer()" aria-label="Close trailer">✕</button>
               <iframe
                 [src]="trailerSafeUrl"
-                frameborder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowfullscreen>
               </iframe>
             </div>
-          </section>
+          </div>
+        }
+
+        <!-- Poster Zoom Modal -->
+        @if (zoomModalOpen) {
+          <div class="zoom-modal-backdrop" (click)="closeZoomModal()">
+            <div class="zoom-modal-content" (click)="$event.stopPropagation()">
+              <button class="zoom-modal-close" (click)="closeZoomModal()" aria-label="Close image">✕</button>
+              
+              <div class="zoom-img-container" [style.transform]="'scale(' + zoomScale + ') translate(' + panX + 'px, ' + panY + 'px)'"
+                   (mousedown)="startPan($event)" (mousemove)="onPan($event)" (mouseup)="endPan()" (mouseleave)="endPan()">
+                <img [src]="movie.posterUrl || fallbackPoster" [alt]="movie.title" class="zoomed-poster" draggable="false" />
+              </div>
+
+              <!-- Interactive Zoom Controls -->
+              <div class="zoom-controls">
+                <button class="btn-zoom" (click)="zoomIn()" aria-label="Zoom in">+</button>
+                <span class="zoom-value">{{ (zoomScale * 100) | number:'1.0-0' }}%</span>
+                <button class="btn-zoom" (click)="zoomOut()" aria-label="Zoom out">−</button>
+                <button class="btn-zoom reset" (click)="resetZoom()">Reset</button>
+              </div>
+            </div>
+          </div>
         }
 
         <!-- Cast -->
@@ -105,6 +131,19 @@ import { ShowService, Show } from '../../core/services/show.service';
             </div>
           }
         </section>
+
+        <!-- Sticky Floating Booking Bar -->
+        <div class="sticky-booking-bar" [class.visible]="showStickyBar">
+          <div class="container" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div class="bar-info">
+              <span class="bar-title">{{ movie.title }}</span>
+              <span class="bar-meta">★ {{ movie.rating }}/10 · {{ movie.language }} · {{ movie.genre }}</span>
+            </div>
+            <button class="btn btn-primary" (click)="scrollToShows()">
+              🎟 Book Now
+            </button>
+          </div>
+        </div>
       }
     </div>
   `,
@@ -124,98 +163,201 @@ import { ShowService, Show } from '../../core/services/show.service';
     .hero-banner {
       position: relative;
       background-size: cover; background-position: center;
-      padding: 60px 0 40px;
+      padding: 80px 0 60px;
     }
     .hero-overlay {
       position: absolute; inset: 0;
-      background: linear-gradient(135deg, rgba(10, 11, 20, 0.92), rgba(10, 11, 20, 0.72));
-      backdrop-filter: blur(6px);
+      background: linear-gradient(135deg, rgba(10, 11, 20, 0.95), rgba(10, 11, 20, 0.75));
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
     .hero-content {
       position: relative;
-      display: flex; gap: 32px; align-items: flex-start;
+      display: flex; gap: 40px; align-items: center;
     }
     .poster-wrap {
-      flex: 0 0 240px;
+      flex: 0 0 260px;
+      position: relative;
+      cursor: zoom-in;
+      perspective: 1000px;
+      
+      &:hover .poster {
+        transform: scale(1.04) rotateY(-5deg) rotateX(5deg);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+      }
+      
       .poster {
         width: 100%; aspect-ratio: 2 / 3; object-fit: cover;
-        border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+        border-radius: var(--radius); box-shadow: var(--shadow-lg);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.5s ease;
+      }
+      
+      .poster-zoom-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: white;
+        font-weight: 600;
+        font-size: 13px;
+        opacity: 0;
+        transition: all 0.3s ease;
+        border-radius: var(--radius);
+      }
+      &:hover .poster-zoom-overlay {
+        opacity: 1;
+      }
+      .zoom-icon {
+        font-size: 24px;
       }
     }
+
+    /* Zoom Lightbox Modal */
+    .zoom-modal-backdrop {
+      position: fixed; inset: 0; z-index: 250;
+      background: rgba(10, 11, 20, 0.95);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .zoom-modal-content {
+      position: relative;
+      max-width: 90vw; max-height: 90vh;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .zoom-modal-close {
+      position: absolute; top: -50px; right: 0;
+      background: none; border: none; color: white;
+      font-size: 28px; cursor: pointer; opacity: 0.7;
+      transition: opacity 0.2s;
+      &:hover { opacity: 1; }
+    }
+    .zoom-img-container {
+      cursor: grab;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.1s ease-out;
+      user-select: none;
+      -webkit-user-drag: none;
+      &:active { cursor: grabbing; }
+    }
+    .zoomed-poster {
+      max-height: 70vh; max-width: 100%;
+      border-radius: var(--radius);
+      box-shadow: 0 30px 70px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .zoom-controls {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 10px 20px; border-radius: 30px; margin-top: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .btn-zoom {
+      background: none; border: none; color: white;
+      font-size: 20px; font-weight: 700; width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; border-radius: 50%;
+      transition: background 0.2s;
+      &:hover { background: rgba(255,255,255,0.1); }
+      &.reset { font-size: 13px; font-weight: 600; width: auto; padding: 0 12px; border-radius: 20px; }
+    }
+    .zoom-value {
+      color: var(--text-primary); font-size: 14px; font-weight: 700;
+      min-width: 48px; text-align: center;
+    }
     .hero-info { flex: 1; min-width: 0; }
-    .title { font-size: 36px; font-weight: 800; margin-bottom: 12px; }
+    .title {
+      font-size: 44px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      line-height: 1.15;
+    }
     .meta-row {
-      display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 24px;
     }
     .rating {
-      background: rgba(241, 196, 15, 0.18); color: #f1c40f;
-      padding: 4px 12px; border-radius: 20px;
+      background: rgba(245, 158, 11, 0.15); color: #fbbf24;
+      padding: 6px 14px; border-radius: 20px;
       font-weight: 700; font-size: 13px;
     }
     .chip {
       background: rgba(255,255,255,0.08); color: var(--text-secondary);
-      padding: 4px 12px; border-radius: 20px; font-size: 12px;
+      padding: 6px 14px; border-radius: 20px; font-size: 13px;
+      border: 1px solid var(--border);
     }
     .synopsis {
-      color: var(--text-secondary); font-size: 15px; line-height: 1.55;
-      max-width: 720px; margin-bottom: 24px;
+      color: var(--text-secondary); font-size: 16px; line-height: 1.6;
+      max-width: 760px; margin-bottom: 32px;
     }
-    .actions { display: flex; gap: 12px; flex-wrap: wrap; }
-
-    .trailer-section { padding: 32px 20px; }
-    .trailer-wrap {
-      position: relative; aspect-ratio: 16 / 9; max-width: 960px; margin: 0 auto;
-      border-radius: var(--radius); overflow: hidden; background: #000;
-    }
-    .trailer-wrap iframe {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-    }
+    .actions { display: flex; gap: 14px; flex-wrap: wrap; }
 
     .cast-section, .shows-section {
-      padding: 32px 20px;
-      h2 { font-size: 22px; font-weight: 700; margin-bottom: 16px; }
+      padding: 40px 0;
+      h2 { font-size: 24px; font-weight: 700; margin-bottom: 24px; }
     }
-    .cast-list { display: flex; flex-wrap: wrap; gap: 12px; }
+    .cast-list { display: flex; flex-wrap: wrap; gap: 16px; }
     .cast-chip {
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: center; gap: 12px;
       background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: 999px; padding: 6px 14px 6px 6px;
+      border-radius: 999px; padding: 8px 18px 8px 8px;
       font-size: 14px;
+      font-weight: 500;
+      transition: var(--transition);
+      &:hover {
+        border-color: var(--accent);
+        transform: scale(1.05);
+      }
     }
     .cast-avatar {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 36px; height: 36px; border-radius: 50%;
       background: var(--accent-gradient); color: white;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 12px;
+      font-weight: 700; font-size: 13px;
     }
 
     .shows-grid {
-      display: grid; gap: 12px;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      display: grid; gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     }
     .show-card {
-      padding: 16px; transition: transform 0.15s, border-color 0.15s;
+      padding: 24px; transition: var(--transition);
       text-decoration: none; color: inherit;
-      &:hover { transform: translateY(-2px); border-color: var(--accent); }
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      &:hover {
+        transform: translateY(-4px);
+        border-color: var(--accent);
+        box-shadow: 0 0 15px var(--accent-glow);
+      }
     }
-    .show-cinema { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
-    .show-screen { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-    .show-time { font-size: 20px; font-weight: 700; color: var(--accent); }
-    .show-date { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .show-cinema { font-weight: 700; font-size: 16px; margin-bottom: 4px; color: var(--text-primary); }
+    .show-screen { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+    .show-time { font-size: 24px; font-weight: 800; color: var(--accent); }
+    .show-date { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
-    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-muted);
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    }
 
     @media (max-width: 768px) {
-      .hero-content { flex-direction: column; gap: 20px; }
-      .poster-wrap { flex: 0 0 auto; max-width: 200px; margin: 0 auto; }
-      .title { font-size: 26px; text-align: center; }
+      .hero-content { flex-direction: column; gap: 24px; text-align: center; }
+      .poster-wrap { flex: 0 0 auto; max-width: 220px; }
+      .title { font-size: 32px; }
       .meta-row { justify-content: center; }
-      .synopsis { text-align: center; }
+      .synopsis { margin-left: auto; margin-right: auto; }
       .actions { justify-content: center; }
     }
   `]
 })
-export class MovieDetailComponent implements OnInit {
+export class MovieDetailComponent implements OnInit, OnDestroy {
   movie: Movie | null = null;
   shows: Show[] = [];
   loading = true;
@@ -224,6 +366,62 @@ export class MovieDetailComponent implements OnInit {
   trailerOpen = false;
   trailerSafeUrl: SafeResourceUrl | null = null;
   fallbackPoster = 'https://placehold.co/300x450/1a1a2e/e23744?text=Movie';
+  showStickyBar = false;
+
+  // Poster Zoom / Lightbox States
+  zoomModalOpen = false;
+  zoomScale = 1.0;
+  panX = 0;
+  panY = 0;
+  private isPanning = false;
+  private startX = 0;
+  private startY = 0;
+
+  openZoomModal() {
+    this.zoomModalOpen = true;
+    this.zoomScale = 1.0;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  closeZoomModal() {
+    this.zoomModalOpen = false;
+  }
+
+  zoomIn() {
+    if (this.zoomScale < 3.0) {
+      this.zoomScale = parseFloat((this.zoomScale + 0.25).toFixed(2));
+    }
+  }
+
+  zoomOut() {
+    if (this.zoomScale > 0.5) {
+      this.zoomScale = parseFloat((this.zoomScale - 0.25).toFixed(2));
+    }
+  }
+
+  resetZoom() {
+    this.zoomScale = 1.0;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  startPan(event: MouseEvent) {
+    this.isPanning = true;
+    this.startX = event.clientX - this.panX;
+    this.startY = event.clientY - this.panY;
+  }
+
+  onPan(event: MouseEvent) {
+    if (this.isPanning) {
+      this.panX = event.clientX - this.startX;
+      this.panY = event.clientY - this.startY;
+    }
+  }
+
+  endPan() {
+    this.isPanning = false;
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -264,6 +462,18 @@ export class MovieDetailComponent implements OnInit {
       },
       error: () => { this.showsLoading = false; }
     });
+  }
+
+  ngOnDestroy() {
+    // Scroll event listener is automatically handled by Angular's host binding
+  }
+
+  @HostListener('window:scroll', [])
+  onWindowScroll() {
+    if (typeof window !== 'undefined') {
+      const scrollPos = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      this.showStickyBar = scrollPos > 450;
+    }
   }
 
   toggleTrailer() { this.trailerOpen = !this.trailerOpen; }

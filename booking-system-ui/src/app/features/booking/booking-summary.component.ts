@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { PaymentService } from '../../core/services/payment.service';
 
 // Declare the Razorpay class loaded from the CDN script in index.html
@@ -8,7 +9,7 @@ declare const Razorpay: any;
 
 @Component({
   selector: 'app-booking-summary',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   template: `
     <div class="summary-page page-enter">
       <div class="summary-card card">
@@ -87,6 +88,120 @@ declare const Razorpay: any;
         }
       </div>
     </div>
+
+    <!-- Dummy Checkout Simulation Modal -->
+    @if (showDummyCheckout) {
+      <div class="modal-backdrop">
+        <div class="modal-card" style="max-width: 500px;" (click)="$event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>Simulated Checkout</h2>
+            <button class="btn btn-ghost" style="padding: 4px 8px; font-size: 16px;" (click)="showDummyCheckout = false" [disabled]="isProcessingDummy">✕</button>
+          </div>
+          
+          <div class="alert alert-info">
+            ℹ️ <strong>Razorpay Mock Mode:</strong> Since api keys are not configured, you can test the checkout flow using this simulated sandbox.
+          </div>
+
+          @if (!isProcessingDummy) {
+            <!-- Payment Mode Selector -->
+            <div class="checkout-payment-modes">
+              <button class="mode-btn" [class.active]="dummyPaymentMode === 'card'" (click)="dummyPaymentMode = 'card'">
+                <span>💳</span> Card
+              </button>
+              <button class="mode-btn" [class.active]="dummyPaymentMode === 'upi'" (click)="dummyPaymentMode = 'upi'">
+                <span>📱</span> UPI
+              </button>
+              <button class="mode-btn" [class.active]="dummyPaymentMode === 'netbanking'" (click)="dummyPaymentMode = 'netbanking'">
+                <span>🏦</span> Netbanking
+              </button>
+            </div>
+
+            <!-- Card form -->
+            @if (dummyPaymentMode === 'card') {
+              <div class="card-graphic">
+                <div class="card-top">
+                  <div class="chip-graphic"></div>
+                  <div class="card-type">VISA</div>
+                </div>
+                <div class="card-number">{{ dummyCardNumber || '•••• •••• •••• ••••' }}</div>
+                <div class="card-bottom">
+                  <div class="card-holder">
+                    <label>Card Holder</label>
+                    <span>{{ dummyCardName || 'John Doe' }}</span>
+                  </div>
+                  <div class="card-expiry">
+                    <label>Expires</label>
+                    <span>{{ dummyCardExpiry || 'MM/YY' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label>Card Number</label>
+                <input type="text" [(ngModel)]="dummyCardNumber" placeholder="4111 2222 3333 4444" aria-label="Card Number" />
+              </div>
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>Card Holder</label>
+                  <input type="text" [(ngModel)]="dummyCardName" placeholder="John Doe" aria-label="Card Holder" />
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>Expiry / CVV</label>
+                  <input type="text" [(ngModel)]="dummyCardExpiry" placeholder="12/29" style="text-align: center;" aria-label="Expiry Date" />
+                </div>
+              </div>
+            }
+
+            <!-- UPI Form -->
+            @if (dummyPaymentMode === 'upi') {
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label>UPI ID (VPA)</label>
+                <input type="text" [(ngModel)]="dummyUpiId" placeholder="username@upi" aria-label="UPI ID" />
+              </div>
+            }
+
+            <!-- Netbanking Form -->
+            @if (dummyPaymentMode === 'netbanking') {
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label>Select Your Bank</label>
+                <select [(ngModel)]="dummySelectedBank" aria-label="Select Bank">
+                  <option value="sbi">State Bank of India (SBI)</option>
+                  <option value="hdfc">HDFC Bank</option>
+                  <option value="icici">ICICI Bank</option>
+                  <option value="axis">Axis Bank</option>
+                </select>
+              </div>
+            }
+
+            <button class="btn btn-primary" style="width: 100%; padding: 14px; margin-top: 10px;" (click)="submitDummyPayment()">
+              💸 Pay Simulated ₹{{ total }}
+            </button>
+          } @else {
+            <!-- Processing animation -->
+            <div style="text-align: center; padding: 20px 0;">
+              <h3 style="margin-bottom: 16px;">Processing Simulated Payment</h3>
+              
+              <div class="step-progress-bar">
+                <div class="step-progress-fill" [style.width.%]="dummyProgress"></div>
+              </div>
+
+              <div class="processing-step-list">
+                @for (step of dummySteps; track step; let idx = $index) {
+                  <div class="processing-step-item" 
+                       [class.active]="dummyActiveStep === idx"
+                       [class.done]="dummyActiveStep > idx">
+                    <div class="step-icon">
+                      @if (dummyActiveStep > idx) { ✓ } @else { {{ idx + 1 }} }
+                    </div>
+                    <span>{{ step }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .summary-page {
@@ -114,10 +229,10 @@ declare const Razorpay: any;
     .cancelled-state {
       .cancel-icon {
         width: 72px; height: 72px; border-radius: 50%;
-        background: rgba(231, 76, 60, 0.15); color: var(--danger);
+        background: rgba(239, 68, 68, 0.15); color: var(--danger);
         display: flex; align-items: center; justify-content: center;
         font-size: 36px; font-weight: 700; margin: 0 auto 20px;
-        border: 2px solid rgba(231, 76, 60, 0.3);
+        border: 2px solid rgba(239, 68, 68, 0.3);
       }
       .sub { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
       .actions { display: flex; flex-direction: column; gap: 12px; }
@@ -136,14 +251,15 @@ declare const Razorpay: any;
     .details {
       background: var(--bg-secondary); border-radius: var(--radius-sm);
       padding: 16px; margin-bottom: 20px;
+      border: 1px solid var(--border);
     }
     .detail-row {
-      display: flex; justify-content: space-between; padding: 10px 0;
+      display: flex; justify-content: space-between; padding: 12px 0;
       font-size: 15px; color: var(--text-secondary);
       &:not(:last-child) { border-bottom: 1px solid var(--border); }
-      .price { font-weight: 700; color: var(--text-primary); font-size: 18px; }
+      .price { font-weight: 700; color: var(--accent); font-size: 20px; }
     }
-    .total-row { background: rgba(226, 55, 68, 0.05); margin: -4px -4px -4px -4px;
+    .total-row { background: rgba(244, 63, 94, 0.05); margin: -4px -4px -4px -4px;
       padding: 14px 4px; border-radius: var(--radius-sm); }
 
     .razorpay-info {
@@ -160,7 +276,7 @@ declare const Razorpay: any;
     }
 
     .error-msg {
-      background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3);
+      background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
       color: var(--danger); padding: 10px; border-radius: var(--radius-sm);
       font-size: 13px; margin-bottom: 16px;
     }
@@ -176,6 +292,26 @@ export class BookingSummaryComponent implements OnInit {
   paymentCancelled = false;
   loading = false;
   error = '';
+
+  // Simulated Checkout States
+  showDummyCheckout = false;
+  dummyPaymentMode: 'card' | 'upi' | 'netbanking' = 'card';
+  dummyCardNumber = '4111 2222 3333 4444';
+  dummyCardName = 'John Doe';
+  dummyCardExpiry = '12/29';
+  dummyCardCvv = '123';
+  dummyUpiId = 'johndoe@upi';
+  dummySelectedBank = 'sbi';
+  isProcessingDummy = false;
+  dummyProgress = 0;
+  dummyActiveStep = 0;
+  dummySteps = [
+    'Initializing secure connection...',
+    'Validating payment details...',
+    'Authorizing simulated transaction...',
+    'Confirming seats & finalizing ticket...'
+  ];
+  dummyOrder: any = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -194,7 +330,7 @@ export class BookingSummaryComponent implements OnInit {
 
   /**
    * Step 1: Call backend to create a Razorpay order,
-   * then open the Razorpay Checkout popup.
+   * then open the Razorpay Checkout popup (or the dummy checkout modal).
    */
   startPayment() {
     this.loading = true;
@@ -203,20 +339,22 @@ export class BookingSummaryComponent implements OnInit {
 
     this.paymentService.createOrder(this.bookingId).subscribe({
       next: (order) => {
-        this.loading = false;
         // Dummy payment flow: trigger if the server signalled dummy mode via
         // either the placeholder Razorpay key or the dummy order-id prefix.
-        // The server enters dummy mode when keyId OR keySecret contains the
-        // placeholder, so matching on keyId alone is insufficient — we also
-        // fall back to the dummy order-id prefix returned by the backend.
         const isDummy =
           order.keyId === 'RAZORPAY_KEY_NOT_SET' ||
           order.keyId.includes('REPLACE_ME') ||
           (typeof order.razorpayOrderId === 'string' &&
             order.razorpayOrderId.startsWith('order_dummy_'));
         if (isDummy) {
-          this.verifyPayment(order.razorpayOrderId, 'dummy_payment_id', 'dummy_signature');
+          // Instantly confirm the payment, skipping the dummy interactive modal
+          this.verifyPayment(
+            order.razorpayOrderId,
+            'dummy_payment_id_' + Math.random().toString(36).substring(2, 11),
+            'dummy_signature'
+          );
         } else {
+          this.loading = false;
           this.openRazorpayPopup(order);
         }
       },
@@ -226,6 +364,47 @@ export class BookingSummaryComponent implements OnInit {
         this.error = msg;
       }
     });
+  }
+
+  /**
+   * Step 2 (Mock): Open simulated payment sandbox popup.
+   */
+  openDummyCheckout(order: any) {
+    this.dummyOrder = order;
+    this.showDummyCheckout = true;
+    this.isProcessingDummy = false;
+    this.dummyProgress = 0;
+    this.dummyActiveStep = 0;
+  }
+
+  submitDummyPayment() {
+    this.isProcessingDummy = true;
+    this.dummyProgress = 0;
+    this.dummyActiveStep = 0;
+    this.error = '';
+
+    const interval = setInterval(() => {
+      this.dummyProgress += 5;
+      if (this.dummyProgress >= 25 && this.dummyActiveStep === 0) {
+        this.dummyActiveStep = 1;
+      }
+      if (this.dummyProgress >= 50 && this.dummyActiveStep === 1) {
+        this.dummyActiveStep = 2;
+      }
+      if (this.dummyProgress >= 75 && this.dummyActiveStep === 2) {
+        this.dummyActiveStep = 3;
+      }
+      if (this.dummyProgress >= 100) {
+        clearInterval(interval);
+        this.showDummyCheckout = false;
+        this.isProcessingDummy = false;
+        this.verifyPayment(
+          this.dummyOrder.razorpayOrderId,
+          'dummy_payment_id_' + Math.random().toString(36).substr(2, 9),
+          'dummy_signature'
+        );
+      }
+    }, 150); // Total duration ~3 seconds
   }
 
   /**
@@ -241,7 +420,7 @@ export class BookingSummaryComponent implements OnInit {
       name: 'BookMyShow Clone',
       description: `Booking #${this.bookingId}`,
       order_id: order.razorpayOrderId,
-      theme: { color: '#E23744' },
+      theme: { color: '#F43F5E' },
       handler: (response: any) => {
         // Payment captured by Razorpay — verify signature on backend
         this.verifyPayment(

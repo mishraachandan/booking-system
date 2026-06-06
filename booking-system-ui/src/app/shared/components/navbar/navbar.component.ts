@@ -2,6 +2,7 @@ import { Component, inject, effect } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
+import { ThemeService } from '../../../core/services/theme.service';
 import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
 
 @Component({
@@ -16,6 +17,9 @@ import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
         </a>
 
         <div class="nav-links">
+          <button class="theme-toggle-btn" (click)="toggleTheme()" aria-label="Toggle Theme">
+            {{ currentTheme() === 'dark' ? '☀️' : '🌙' }}
+          </button>
           @if (isLoggedIn) {
             <span class="user-greeting">👤 {{ firstName }}</span>
             <a routerLink="/my-bookings" class="nav-link">My Bookings</a>
@@ -38,8 +42,9 @@ import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
       left: 0;
       right: 0;
       height: 64px;
-      background: rgba(10, 10, 15, 0.85);
+      background: var(--glass-bg);
       backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
       z-index: 1000;
     }
@@ -62,7 +67,7 @@ import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
     .nav-link {
       color: var(--text-secondary);
@@ -87,7 +92,10 @@ export class NavbarComponent {
   firstName = '';
 
   private readonly authService = inject(AuthService);
+  private readonly themeService = inject(ThemeService);
   private readonly keycloakSignal = inject(KEYCLOAK_EVENT_SIGNAL);
+
+  currentTheme = this.themeService.theme;
 
   constructor() {
     // React to Keycloak events via signal (v21 API)
@@ -106,6 +114,10 @@ export class NavbarComponent {
         }
       }
     });
+  }
+
+  toggleTheme() {
+    this.themeService.toggleTheme();
   }
 
   logout() {

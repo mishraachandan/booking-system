@@ -53,10 +53,10 @@ import { AuthService } from '../../core/services/auth.service';
           <span class="legend-item"><span class="seat-dot premium"></span> Premium ₹350</span>
         </div>
 
-        <!-- Screen indicator -->
-        <div class="screen-indicator">
-          <div class="screen-line"></div>
-          <span>SCREEN</span>
+        <!-- Curved Cinematic Screen -->
+        <div class="cinema-screen-wrap">
+          <div class="cinema-screen"></div>
+          <span class="cinema-screen-text">SCREEN</span>
         </div>
 
         <!-- Seat Grid -->
@@ -154,7 +154,7 @@ import { AuthService } from '../../core/services/auth.service';
     </div>
   `,
   styles: [`
-    .seat-page { padding-top: 20px; padding-bottom: 100px; }
+    .seat-page { padding-top: 20px; padding-bottom: 120px; }
 
     .loading-state {
       text-align: center; padding: 120px 0; color: var(--text-muted);
@@ -174,204 +174,216 @@ import { AuthService } from '../../core/services/auth.service';
 
     .show-info-bar {
       display: flex; justify-content: space-between; align-items: flex-start;
-      margin-bottom: 24px; padding: 20px 24px; background: var(--bg-card);
+      margin-bottom: 24px; padding: 24px; background: var(--bg-card);
       border-radius: var(--radius); border: 1px solid var(--border);
     }
-    .show-title { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
-    .show-meta { color: var(--text-secondary); font-size: 14px; margin-bottom: 8px; }
+    .show-title { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
+    .show-meta { color: var(--text-secondary); font-size: 14px; margin-bottom: 12px; }
     .show-tags { display: flex; gap: 8px; flex-wrap: wrap; }
     .tag {
-      background: rgba(226,55,68,0.12); color: var(--accent);
-      padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      background: rgba(244, 63, 94, 0.08); color: var(--accent);
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      border: 1px solid rgba(244, 63, 94, 0.15);
     }
 
     .timer {
-      font-size: 28px; font-weight: 700; font-family: 'Outfit', monospace;
-      color: var(--success); padding: 8px 20px;
-      background: rgba(46, 204, 113, 0.1); border-radius: var(--radius-sm);
+      font-size: 28px; font-weight: 700; font-family: var(--font-mono);
+      color: var(--success); padding: 10px 24px;
+      background: rgba(16, 185, 129, 0.08); border-radius: var(--radius-sm);
+      border: 1px solid rgba(16, 185, 129, 0.15);
       white-space: nowrap;
-      &.urgent { color: var(--danger); background: rgba(231, 76, 60, 0.1); }
+      animation: pulseSuccess 2s infinite;
+      &.urgent {
+        color: var(--danger);
+        background: rgba(239, 68, 68, 0.08);
+        border-color: rgba(239, 68, 68, 0.15);
+        animation: pulseGlow 1s infinite;
+      }
     }
 
     .legend {
       display: flex; gap: 24px; justify-content: center;
-      flex-wrap: wrap; margin-bottom: 24px;
-      padding: 14px 20px; background: var(--bg-card);
+      flex-wrap: wrap; margin-bottom: 32px;
+      padding: 16px 24px; background: var(--bg-card);
       border-radius: var(--radius-sm); border: 1px solid var(--border);
-      .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+      .legend-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); font-weight: 600; }
     }
     .seat-dot {
-      width: 18px; height: 18px; border-radius: 4px;
-      &.available { background: #1a6b3c; border: 2px solid #2ecc71; }
-      &.selected { background: #e23744; border: 2px solid #ff4757; box-shadow: 0 0 6px rgba(226, 55, 68, 0.5); }
-      &.locked { background: #c0760e; border: 2px solid #f39c12; }
-      &.booked { background: #2c2c3a; border: 2px solid #555; position: relative; }
+      width: 20px; height: 20px; border-radius: 6px;
+      &.available { background: rgba(16, 185, 129, 0.1); border: 2px solid var(--success); }
+      &.selected { background: var(--accent); border: 2px solid var(--accent-hover); box-shadow: 0 0 10px var(--accent-glow); }
+      &.locked { background: rgba(245, 158, 11, 0.1); border: 2px solid var(--warning); }
+      &.booked { background: #1e1e2e; border: 2px solid #333; position: relative; opacity: 0.5; }
       &.booked::after {
-        content: '✕'; position: absolute; color: #666; font-size: 10px;
+        content: '✕'; position: absolute; color: #555; font-size: 10px;
         display: flex; align-items: center; justify-content: center;
-        width: 100%; height: 100%;
+        width: 100%; height: 100%; top: 0; left: 0; font-weight: bold;
       }
-      &.vip { background: rgba(241, 196, 15, 0.25); border: 2px solid #f1c40f; }
-      &.premium { background: rgba(155, 89, 182, 0.25); border: 2px solid #9b59b6; }
-    }
-
-    .screen-indicator {
-      text-align: center; margin-bottom: 32px;
-      span { font-size: 11px; color: var(--text-muted); letter-spacing: 4px; display: block; margin-top: 6px; }
-      .screen-line {
-        width: 55%; max-width: 440px; height: 4px; margin: 0 auto;
-        background: var(--accent-gradient); border-radius: 2px;
-        box-shadow: 0 0 20px rgba(226, 55, 68, 0.4);
-      }
+      &.vip { background: rgba(245, 158, 11, 0.2); border: 2px solid #f59e0b; }
+      &.premium { background: rgba(139, 92, 246, 0.2); border: 2px solid #8b5cf6; }
     }
 
     .seat-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 12px;
-      max-width: 360px;
-      margin: 0 auto 32px;
+      gap: 14px;
+      max-width: 380px;
+      margin: 0 auto 48px;
     }
 
     .seat {
       aspect-ratio: 1;
       display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+      font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
       border-radius: 8px; border: 2px solid transparent;
-      transition: all 0.2s ease; cursor: pointer;
+      transition: var(--transition); cursor: pointer;
       position: relative;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
 
-      /* DEFAULT: Available — bright green border, dark green tint */
       &.seat-available {
-        background: rgba(46, 204, 113, 0.08);
-        border-color: #2ecc71;
-        color: #2ecc71;
+        background: rgba(16, 185, 129, 0.05);
+        border-color: var(--success);
+        color: var(--success);
       }
       &.seat-available:hover {
-        background: rgba(46, 204, 113, 0.2);
-        transform: scale(1.12);
-        box-shadow: 0 0 14px rgba(46, 204, 113, 0.4);
+        background: rgba(16, 185, 129, 0.15);
+        transform: scale(1.15);
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
       }
 
-      /* SELECTED — bright red/accent fill */
       &.seat-selected {
-        background: var(--accent); color: white; border-color: #ff4757;
-        transform: scale(1.08);
-        box-shadow: 0 0 16px rgba(226, 55, 68, 0.5);
+        background: var(--accent); color: white; border-color: var(--accent-hover);
+        transform: scale(1.1);
+        box-shadow: 0 0 16px var(--accent-glow);
+        animation: pulseGlow 2s infinite;
       }
 
-      /* LOCKED — orange border+tint */
       &.seat-locked {
-        background: rgba(243, 156, 18, 0.12);
-        border-color: #f39c12; color: #f39c12;
+        background: rgba(245, 158, 11, 0.08);
+        border-color: var(--warning); color: var(--warning);
         cursor: not-allowed;
       }
 
-      /* BOOKED — muted dark, slashed */
       &.seat-booked {
-        background: #1e1e2e; color: #444; cursor: not-allowed;
-        border-color: #333; opacity: 0.6;
+        background: var(--bg-primary); color: #3f3f56; cursor: not-allowed;
+        border-color: var(--border); opacity: 0.4;
       }
       &.seat-booked::after {
         content: '';
         position: absolute; inset: 4px;
         border-radius: 4px;
         background: repeating-linear-gradient(
-          -45deg, transparent, transparent 3px, rgba(100,100,100,0.15) 3px, rgba(100,100,100,0.15) 5px
+          -45deg, transparent, transparent 3px, rgba(100,100,100,0.1) 3px, rgba(100,100,100,0.1) 5px
         );
       }
 
-      /* Type accents — bottom strip */
-      &.seat-premium { border-bottom: 3px solid #9b59b6; }
-      &.seat-vip { border-bottom: 3px solid #f1c40f; }
+      &.seat-premium { border-bottom: 3px solid #8b5cf6; }
+      &.seat-vip { border-bottom: 3px solid #f59e0b; }
     }
 
     .summary-bar {
       position: fixed; bottom: 0; left: 0; right: 0;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 32px;
-      background: rgba(26, 26, 46, 0.97); backdrop-filter: blur(20px);
-      border-top: 1px solid var(--border); z-index: 100;
+      padding: 18px 36px;
+      background: var(--glass-bg); backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--glass-border); z-index: 100;
+      box-shadow: 0 -8px 30px rgba(0,0,0,0.3);
     }
-    .summary-info { display: flex; align-items: center; gap: 20px; }
-    .seat-count { font-size: 14px; color: var(--text-secondary); }
-    .total-price { font-size: 26px; font-weight: 700; }
+    .summary-info { display: flex; align-items: center; gap: 24px; }
+    .seat-count { font-size: 15px; color: var(--text-secondary); font-weight: 500; }
+    .total-price { font-size: 28px; font-weight: 800; color: var(--accent); }
 
     .error-msg {
-      background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3);
-      color: var(--danger); padding: 12px 16px; border-radius: var(--radius-sm);
-      font-size: 13px; max-width: 500px; margin: 16px auto;
+      background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--danger); padding: 14px 20px; border-radius: var(--radius-sm);
+      font-size: 14px; max-width: 540px; margin: 24px auto; text-align: center;
+      font-weight: 500;
     }
 
     @media (max-width: 600px) {
-      .seat-grid { max-width: 280px; gap: 8px; }
-      .show-info-bar { flex-direction: column; gap: 12px; }
-      .summary-bar { padding: 14px 16px; }
+      .seat-grid { max-width: 300px; gap: 8px; }
+      .show-info-bar { flex-direction: column; gap: 16px; }
+      .summary-bar { padding: 16px 20px; }
     }
 
     /* Add-ons picker */
     .addons-section {
-      margin-top: 32px; background: var(--bg-card);
+      margin-top: 40px; background: var(--bg-card);
       border: 1px solid var(--border); border-radius: var(--radius);
       overflow: hidden;
+      box-shadow: var(--shadow);
     }
     .addons-head {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 16px 20px; cursor: pointer;
-      h2 { font-size: 16px; font-weight: 700; margin: 0; }
-      .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+      padding: 20px 24px; cursor: pointer;
+      h2 { font-size: 18px; font-weight: 700; margin: 0; }
+      .sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
       &:hover { background: var(--bg-secondary); }
     }
     .chev {
       font-size: 20px; color: var(--text-muted);
-      transition: transform 0.2s;
+      transition: var(--transition);
       &.open { transform: rotate(180deg); }
     }
     .addons-grid {
-      padding: 16px 20px 20px;
-      display: grid; gap: 12px;
-      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      padding: 24px;
+      display: grid; gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       border-top: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.05);
     }
     .addon-card {
       background: var(--bg-secondary); border: 1px solid var(--border);
       border-radius: var(--radius-sm); overflow: hidden;
       display: flex; flex-direction: column;
+      transition: var(--transition);
+      &:hover {
+        border-color: var(--border-hover);
+        transform: translateY(-2px);
+      }
     }
-    .addon-image-wrap { position: relative; aspect-ratio: 4 / 3; background: #0a0b14; }
+    .addon-image-wrap { position: relative; aspect-ratio: 4 / 3; background: #000; }
     .addon-image { width: 100%; height: 100%; object-fit: cover; display: block; }
     .addon-chip {
-      position: absolute; top: 8px; left: 8px;
-      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
-      padding: 3px 8px; border-radius: 10px; text-transform: uppercase;
-      &.food { background: rgba(230, 126, 34, 0.9); color: white; }
-      &.beverage { background: rgba(52, 152, 219, 0.9); color: white; }
-      &.combo { background: rgba(226, 55, 68, 0.9); color: white; }
+      position: absolute; top: 10px; left: 10px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+      padding: 4px 10px; border-radius: 20px; text-transform: uppercase;
+      &.food { background: rgba(245, 158, 11, 0.95); color: white; }
+      &.beverage { background: rgba(59, 130, 246, 0.95); color: white; }
+      &.combo { background: rgba(244, 63, 94, 0.95); color: white; }
     }
     .addon-body {
-      flex: 1; padding: 12px 14px;
-      display: flex; flex-direction: column; gap: 6px;
+      flex: 1; padding: 16px;
+      display: flex; flex-direction: column; gap: 8px;
     }
-    .addon-name { font-weight: 600; font-size: 14px; }
-    .addon-desc { font-size: 12px; color: var(--text-muted); flex: 1; line-height: 1.4; }
+    .addon-name { font-weight: 700; font-size: 15px; color: var(--text-primary); }
+    .addon-desc { font-size: 12px; color: var(--text-secondary); flex: 1; line-height: 1.5; }
     .addon-footer {
       display: flex; justify-content: space-between; align-items: center;
-      margin-top: 4px;
+      margin-top: 8px;
     }
-    .addon-price { font-weight: 700; color: var(--accent); }
+    .addon-price { font-weight: 800; color: var(--accent); font-size: 16px; }
     .qty-stepper {
       display: inline-flex; align-items: center;
       border: 1px solid var(--border); border-radius: 999px;
       background: var(--bg-card);
+      padding: 2px;
     }
     .qty-btn {
-      width: 28px; height: 28px; border: none; background: none;
+      width: 30px; height: 30px; border: none; background: none;
       color: var(--text-primary); font-size: 16px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      transition: var(--transition);
       &:disabled { opacity: 0.35; cursor: not-allowed; }
-      &:hover:not(:disabled) { color: var(--accent); }
+      &:hover:not(:disabled) {
+        color: var(--accent);
+        background: var(--bg-secondary);
+      }
     }
-    .qty-val { min-width: 20px; text-align: center; font-weight: 600; font-size: 13px; }
+    .qty-val { min-width: 24px; text-align: center; font-weight: 700; font-size: 14px; color: var(--text-primary); }
   `]
 })
 export class SeatSelectionComponent implements OnInit, OnDestroy {
