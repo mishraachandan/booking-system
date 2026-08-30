@@ -42,4 +42,9 @@ out/
 config.env
 
 ### Logs ###
-logs/.env.dev
+logs/
+*.log
+
+### Frontend Build ###
+booking-system-ui/dist/
+booking-system-ui/.angular/

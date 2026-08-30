@@ -59,6 +59,7 @@ pricing:
 
 # ── Keycloak Admin & Migration ────────────────────────────────────────────────
 keycloak:
+  enabled: ${KEYCLOAK_ENABLED:false}
   admin:
     server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8180}
     realm: ${KEYCLOAK_REALM:booking-system}
@@ -66,7 +67,7 @@ keycloak:
     username: ${KEYCLOAK_ADMIN_USER:admin}
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
   migration:
-    enabled: ${KEYCLOAK_MIGRATION_ENABLED:true}
+    enabled: ${KEYCLOAK_MIGRATION_ENABLED:false}
 
 # Restrict Spring Boot Actuator to a minimal, safe set of endpoints. Even
 # with the Spring Security filter chain in place, explicitly pinning the

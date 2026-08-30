@@ -18,9 +18,15 @@ import java.util.List;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final com.mishraachandan.booking_system.service.QRCodeService qrCodeService;
+    private final com.mishraachandan.booking_system.repository.BookingRepository bookingRepository;
 
-    public BookingController(BookingService bookingService) {
+    public BookingController(BookingService bookingService, 
+                             com.mishraachandan.booking_system.service.QRCodeService qrCodeService,
+                             com.mishraachandan.booking_system.repository.BookingRepository bookingRepository) {
         this.bookingService = bookingService;
+        this.qrCodeService = qrCodeService;
+        this.bookingRepository = bookingRepository;
     }
 
     /**
@@ -84,5 +90,30 @@ public class BookingController {
 
         bookingService.cancelBooking(bookingId, principal.getUserId());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Generate QR code for a booking.
+     */
+    @GetMapping("/{id}/qr")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> getBookingQR(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+        
+        boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (!booking.getUser().getId().equals(principal.getUserId()) && !isAdmin) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+        }
+
+        byte[] qrBytes = qrCodeService.generateBookingQR(booking.getId(), booking.getUser().getEmail());
+        return ResponseEntity.ok()
+            .header("Content-Type", "image/png")
+            .header("Cache-Control", "no-cache")
+            .body(qrBytes);
     }
 }

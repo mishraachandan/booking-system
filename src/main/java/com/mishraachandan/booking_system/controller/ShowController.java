@@ -8,6 +8,7 @@ import com.mishraachandan.booking_system.dto.pojo.LockSeatsRequest;
 import com.mishraachandan.booking_system.dto.pojo.ShowSeatResponse;
 import com.mishraachandan.booking_system.service.ShowSeatLockService;
 import com.mishraachandan.booking_system.service.ShowService;
+import com.mishraachandan.booking_system.service.SeatRecommendationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ public class ShowController {
 
     private final ShowService showService;
     private final ShowSeatLockService showSeatLockService;
+    private final SeatRecommendationService seatRecommendationService;
 
     /**
      * Get all shows, optionally filtered by city.
@@ -88,6 +90,18 @@ public class ShowController {
     public ResponseEntity<Void> unlockSeat(@PathVariable Long showSeatId) {
         showSeatLockService.unlockShowSeat(showSeatId);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Get seat recommendations for a show.
+     * Returns the best available contiguous seat block.
+     */
+    @GetMapping("/{showId}/seats/recommend")
+    public ResponseEntity<List<ShowSeatResponse>> recommendSeats(
+            @PathVariable Long showId,
+            @RequestParam(defaultValue = "2") int count) {
+        List<ShowSeatResponse> recommendations = seatRecommendationService.recommendAsResponse(showId, count);
+        return ResponseEntity.ok(recommendations);
     }
 
     /**

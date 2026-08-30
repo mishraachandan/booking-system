@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { PaymentService } from '../../core/services/payment.service';
 
 // Declare the Razorpay class loaded from the CDN script in index.html
@@ -8,7 +9,7 @@ declare const Razorpay: any;
 
 @Component({
   selector: 'app-booking-summary',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   template: `
     <div class="summary-page page-enter">
       <div class="summary-card card">
@@ -45,6 +46,45 @@ declare const Razorpay: any;
         } @else {
           <div class="confirm-state">
             <h1>Complete Your Booking</h1>
+
+            <!-- Promo Code / Coupon Section -->
+            <div class="coupon-section">
+              @if (!appliedCoupon) {
+                <div class="coupon-input-wrap">
+                  <span class="coupon-icon">🏷️</span>
+                  <input
+                    type="text"
+                    [(ngModel)]="couponCodeInput"
+                    placeholder="Enter promo code (e.g. FIRST50)"
+                    aria-label="Promo Code" />
+                  <button class="btn btn-primary btn-apply" (click)="applyCoupon(couponCodeInput)">Apply</button>
+                </div>
+
+                @if (couponError) {
+                  <div class="coupon-msg error">{{ couponError }}</div>
+                }
+
+                <div class="coupon-suggestions">
+                  <span class="sugg-label">Available Offers:</span>
+                  <div class="sugg-chips">
+                    <button class="sugg-chip" (click)="applyCoupon('FIRST50')">FIRST50 (₹50 off)</button>
+                    <button class="sugg-chip" (click)="applyCoupon('BMSFREE')">BMSFREE (₹100 off)</button>
+                    @if (addOnTotal > 0) {
+                      <button class="sugg-chip" (click)="applyCoupon('SNACK20')">SNACK20 (20% F&amp;B off)</button>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <div class="applied-coupon-card">
+                  <div class="coupon-left">
+                    <span class="applied-tag">✓ {{ appliedCoupon }}</span>
+                    <span class="applied-desc">{{ appliedCouponDesc }}</span>
+                  </div>
+                  <button class="btn-remove-coupon" (click)="removeCoupon()">✕ Remove</button>
+                </div>
+              }
+            </div>
+
             <div class="details">
               <div class="detail-row">
                 <span>Booking ID</span>
@@ -60,9 +100,15 @@ declare const Razorpay: any;
                   <span>₹{{ addOnTotal }}</span>
                 </div>
               }
+              @if (discountAmount > 0) {
+                <div class="detail-row discount-row">
+                  <span>Discount ({{ appliedCoupon }}) 🎁</span>
+                  <span class="discount-val">− ₹{{ discountAmount }}</span>
+                </div>
+              }
               <div class="detail-row total-row">
                 <span>Total Amount</span>
-                <span class="price">₹{{ total }}</span>
+                <span class="price">₹{{ payableTotal }}</span>
               </div>
             </div>
 
@@ -77,7 +123,7 @@ declare const Razorpay: any;
               class="btn btn-primary full-width pay-btn"
               (click)="startPayment()"
               [disabled]="loading">
-              {{ loading ? 'Opening payment...' : '💳 Pay Now ₹' + total }}
+              {{ loading ? 'Opening payment...' : '💳 Pay Now ₹' + payableTotal }}
             </button>
 
             <p class="cancel-note">
@@ -87,6 +133,120 @@ declare const Razorpay: any;
         }
       </div>
     </div>
+
+    <!-- Dummy Checkout Simulation Modal -->
+    @if (showDummyCheckout) {
+      <div class="modal-backdrop">
+        <div class="modal-card" style="max-width: 500px;" (click)="$event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>Simulated Checkout</h2>
+            <button class="btn btn-ghost" style="padding: 4px 8px; font-size: 16px;" (click)="showDummyCheckout = false" [disabled]="isProcessingDummy">✕</button>
+          </div>
+          
+          <div class="alert alert-info">
+            ℹ️ <strong>Razorpay Mock Mode:</strong> Since api keys are not configured, you can test the checkout flow using this simulated sandbox.
+          </div>
+
+          @if (!isProcessingDummy) {
+            <!-- Payment Mode Selector -->
+            <div class="checkout-payment-modes">
+              <button class="mode-btn" [class.active]="dummyPaymentMode === 'card'" (click)="dummyPaymentMode = 'card'">
+                <span>💳</span> Card
+              </button>
+              <button class="mode-btn" [class.active]="dummyPaymentMode === 'upi'" (click)="dummyPaymentMode = 'upi'">
+                <span>📱</span> UPI
+              </button>
+              <button class="mode-btn" [class.active]="dummyPaymentMode === 'netbanking'" (click)="dummyPaymentMode = 'netbanking'">
+                <span>🏦</span> Netbanking
+              </button>
+            </div>
+
+            <!-- Card form -->
+            @if (dummyPaymentMode === 'card') {
+              <div class="card-graphic">
+                <div class="card-top">
+                  <div class="chip-graphic"></div>
+                  <div class="card-type">VISA</div>
+                </div>
+                <div class="card-number">{{ dummyCardNumber || '•••• •••• •••• ••••' }}</div>
+                <div class="card-bottom">
+                  <div class="card-holder">
+                    <label>Card Holder</label>
+                    <span>{{ dummyCardName || 'John Doe' }}</span>
+                  </div>
+                  <div class="card-expiry">
+                    <label>Expires</label>
+                    <span>{{ dummyCardExpiry || 'MM/YY' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label>Card Number</label>
+                <input type="text" [(ngModel)]="dummyCardNumber" placeholder="4111 2222 3333 4444" aria-label="Card Number" />
+              </div>
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>Card Holder</label>
+                  <input type="text" [(ngModel)]="dummyCardName" placeholder="John Doe" aria-label="Card Holder" />
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>Expiry / CVV</label>
+                  <input type="text" [(ngModel)]="dummyCardExpiry" placeholder="12/29" style="text-align: center;" aria-label="Expiry Date" />
+                </div>
+              </div>
+            }
+
+            <!-- UPI Form -->
+            @if (dummyPaymentMode === 'upi') {
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label>UPI ID (VPA)</label>
+                <input type="text" [(ngModel)]="dummyUpiId" placeholder="username@upi" aria-label="UPI ID" />
+              </div>
+            }
+
+            <!-- Netbanking Form -->
+            @if (dummyPaymentMode === 'netbanking') {
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label>Select Your Bank</label>
+                <select [(ngModel)]="dummySelectedBank" aria-label="Select Bank">
+                  <option value="sbi">State Bank of India (SBI)</option>
+                  <option value="hdfc">HDFC Bank</option>
+                  <option value="icici">ICICI Bank</option>
+                  <option value="axis">Axis Bank</option>
+                </select>
+              </div>
+            }
+
+            <button class="btn btn-primary" style="width: 100%; padding: 14px; margin-top: 10px;" (click)="submitDummyPayment()">
+              💸 Pay Simulated ₹{{ total }}
+            </button>
+          } @else {
+            <!-- Processing animation -->
+            <div style="text-align: center; padding: 20px 0;">
+              <h3 style="margin-bottom: 16px;">Processing Simulated Payment</h3>
+              
+              <div class="step-progress-bar">
+                <div class="step-progress-fill" [style.width.%]="dummyProgress"></div>
+              </div>
+
+              <div class="processing-step-list">
+                @for (step of dummySteps; track step; let idx = $index) {
+                  <div class="processing-step-item" 
+                       [class.active]="dummyActiveStep === idx"
+                       [class.done]="dummyActiveStep > idx">
+                    <div class="step-icon">
+                      @if (dummyActiveStep > idx) { ✓ } @else { {{ idx + 1 }} }
+                    </div>
+                    <span>{{ step }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .summary-page {
@@ -114,10 +274,10 @@ declare const Razorpay: any;
     .cancelled-state {
       .cancel-icon {
         width: 72px; height: 72px; border-radius: 50%;
-        background: rgba(231, 76, 60, 0.15); color: var(--danger);
+        background: rgba(239, 68, 68, 0.15); color: var(--danger);
         display: flex; align-items: center; justify-content: center;
         font-size: 36px; font-weight: 700; margin: 0 auto 20px;
-        border: 2px solid rgba(231, 76, 60, 0.3);
+        border: 2px solid rgba(239, 68, 68, 0.3);
       }
       .sub { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
       .actions { display: flex; flex-direction: column; gap: 12px; }
@@ -136,14 +296,15 @@ declare const Razorpay: any;
     .details {
       background: var(--bg-secondary); border-radius: var(--radius-sm);
       padding: 16px; margin-bottom: 20px;
+      border: 1px solid var(--border);
     }
     .detail-row {
-      display: flex; justify-content: space-between; padding: 10px 0;
+      display: flex; justify-content: space-between; padding: 12px 0;
       font-size: 15px; color: var(--text-secondary);
       &:not(:last-child) { border-bottom: 1px solid var(--border); }
-      .price { font-weight: 700; color: var(--text-primary); font-size: 18px; }
+      .price { font-weight: 700; color: var(--accent); font-size: 20px; }
     }
-    .total-row { background: rgba(226, 55, 68, 0.05); margin: -4px -4px -4px -4px;
+    .total-row { background: rgba(244, 63, 94, 0.05); margin: -4px -4px -4px -4px;
       padding: 14px 4px; border-radius: var(--radius-sm); }
 
     .razorpay-info {
@@ -159,8 +320,97 @@ declare const Razorpay: any;
       margin-top: 8px;
     }
 
+    /* Coupon Section */
+    .coupon-section {
+      margin-bottom: 20px;
+    }
+    .coupon-input-wrap {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px 6px 4px 12px;
+      transition: var(--transition);
+      &:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 10px var(--accent-glow);
+      }
+      .coupon-icon { font-size: 16px; }
+      input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 600;
+        outline: none;
+        text-transform: uppercase;
+        &::placeholder { text-transform: none; color: var(--text-muted); font-weight: 400; }
+      }
+      .btn-apply {
+        padding: 8px 18px;
+        font-size: 13px;
+        border-radius: var(--radius-sm);
+      }
+    }
+    .coupon-msg {
+      font-size: 12px;
+      margin-top: 6px;
+      padding: 0 4px;
+      &.error { color: var(--danger); }
+      &.success { color: var(--success); }
+    }
+    .coupon-suggestions {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      .sugg-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+      .sugg-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+      .sugg-chip {
+        background: rgba(244, 63, 94, 0.06);
+        border: 1px dashed rgba(244, 63, 94, 0.3);
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: var(--transition);
+        &:hover {
+          background: var(--accent);
+          color: white;
+        }
+      }
+    }
+    .applied-coupon-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      .coupon-left { display: flex; flex-direction: column; gap: 2px; }
+      .applied-tag { font-weight: 800; font-size: 13px; color: var(--success); }
+      .applied-desc { font-size: 11px; color: var(--text-secondary); }
+      .btn-remove-coupon {
+        background: none; border: none; color: var(--danger); font-size: 12px;
+        cursor: pointer; font-weight: 600; padding: 4px;
+        &:hover { text-decoration: underline; }
+      }
+    }
+    .discount-row {
+      color: var(--success) !important;
+      font-weight: 600;
+      .discount-val { font-weight: 700; font-size: 16px; color: var(--success); }
+    }
+
     .error-msg {
-      background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3);
+      background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
       color: var(--danger); padding: 10px; border-radius: var(--radius-sm);
       font-size: 13px; margin-bottom: 16px;
     }
@@ -176,6 +426,79 @@ export class BookingSummaryComponent implements OnInit {
   paymentCancelled = false;
   loading = false;
   error = '';
+
+  // Promo Code Engine State
+  couponCodeInput = '';
+  appliedCoupon = '';
+  appliedCouponDesc = '';
+  discountAmount = 0;
+  couponError = '';
+
+  get payableTotal(): number {
+    return Math.max(0, this.total - this.discountAmount);
+  }
+
+  applyCoupon(code: string) {
+    this.couponError = '';
+    const cleanCode = (code || '').trim().toUpperCase();
+    if (!cleanCode) {
+      this.couponError = 'Please enter a valid coupon code.';
+      return;
+    }
+
+    if (cleanCode === 'FIRST50') {
+      this.discountAmount = 50;
+      this.appliedCoupon = 'FIRST50';
+      this.appliedCouponDesc = 'Flat ₹50 savings on your booking!';
+    } else if (cleanCode === 'BMSFREE') {
+      if (this.total < 400) {
+        this.couponError = 'BMSFREE requires a minimum booking total of ₹400.';
+        return;
+      }
+      this.discountAmount = 100;
+      this.appliedCoupon = 'BMSFREE';
+      this.appliedCouponDesc = 'Flat ₹100 instant discount applied!';
+    } else if (cleanCode === 'SNACK20') {
+      if (this.addOnTotal <= 0) {
+        this.couponError = 'SNACK20 requires food & beverage add-ons in your cart.';
+        return;
+      }
+      this.discountAmount = Math.round(this.addOnTotal * 0.20);
+      this.appliedCoupon = 'SNACK20';
+      this.appliedCouponDesc = '20% off on your food and beverages combo!';
+    } else {
+      this.couponError = `Coupon code "${cleanCode}" is invalid or expired.`;
+      return;
+    }
+  }
+
+  removeCoupon() {
+    this.appliedCoupon = '';
+    this.appliedCouponDesc = '';
+    this.discountAmount = 0;
+    this.couponCodeInput = '';
+    this.couponError = '';
+  }
+
+  // Simulated Checkout States
+  showDummyCheckout = false;
+  dummyPaymentMode: 'card' | 'upi' | 'netbanking' = 'card';
+  dummyCardNumber = '4111 2222 3333 4444';
+  dummyCardName = 'John Doe';
+  dummyCardExpiry = '12/29';
+  dummyCardCvv = '123';
+  dummyUpiId = 'johndoe@upi';
+  dummySelectedBank = 'sbi';
+  isProcessingDummy = false;
+  dummyProgress = 0;
+  dummyActiveStep = 0;
+  dummySteps = [
+    'Initializing secure connection...',
+    'Validating payment details...',
+    'Authorizing simulated transaction...',
+    'Confirming seats & finalizing ticket...'
+  ];
+  dummyOrder: any = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -194,7 +517,7 @@ export class BookingSummaryComponent implements OnInit {
 
   /**
    * Step 1: Call backend to create a Razorpay order,
-   * then open the Razorpay Checkout popup.
+   * then open the Razorpay Checkout popup (or the dummy checkout modal).
    */
   startPayment() {
     this.loading = true;
@@ -203,20 +526,22 @@ export class BookingSummaryComponent implements OnInit {
 
     this.paymentService.createOrder(this.bookingId).subscribe({
       next: (order) => {
-        this.loading = false;
         // Dummy payment flow: trigger if the server signalled dummy mode via
         // either the placeholder Razorpay key or the dummy order-id prefix.
-        // The server enters dummy mode when keyId OR keySecret contains the
-        // placeholder, so matching on keyId alone is insufficient — we also
-        // fall back to the dummy order-id prefix returned by the backend.
         const isDummy =
           order.keyId === 'RAZORPAY_KEY_NOT_SET' ||
           order.keyId.includes('REPLACE_ME') ||
           (typeof order.razorpayOrderId === 'string' &&
             order.razorpayOrderId.startsWith('order_dummy_'));
         if (isDummy) {
-          this.verifyPayment(order.razorpayOrderId, 'dummy_payment_id', 'dummy_signature');
+          // Instantly confirm the payment, skipping the dummy interactive modal
+          this.verifyPayment(
+            order.razorpayOrderId,
+            'dummy_payment_id_' + Math.random().toString(36).substring(2, 11),
+            'dummy_signature'
+          );
         } else {
+          this.loading = false;
           this.openRazorpayPopup(order);
         }
       },
@@ -226,6 +551,47 @@ export class BookingSummaryComponent implements OnInit {
         this.error = msg;
       }
     });
+  }
+
+  /**
+   * Step 2 (Mock): Open simulated payment sandbox popup.
+   */
+  openDummyCheckout(order: any) {
+    this.dummyOrder = order;
+    this.showDummyCheckout = true;
+    this.isProcessingDummy = false;
+    this.dummyProgress = 0;
+    this.dummyActiveStep = 0;
+  }
+
+  submitDummyPayment() {
+    this.isProcessingDummy = true;
+    this.dummyProgress = 0;
+    this.dummyActiveStep = 0;
+    this.error = '';
+
+    const interval = setInterval(() => {
+      this.dummyProgress += 5;
+      if (this.dummyProgress >= 25 && this.dummyActiveStep === 0) {
+        this.dummyActiveStep = 1;
+      }
+      if (this.dummyProgress >= 50 && this.dummyActiveStep === 1) {
+        this.dummyActiveStep = 2;
+      }
+      if (this.dummyProgress >= 75 && this.dummyActiveStep === 2) {
+        this.dummyActiveStep = 3;
+      }
+      if (this.dummyProgress >= 100) {
+        clearInterval(interval);
+        this.showDummyCheckout = false;
+        this.isProcessingDummy = false;
+        this.verifyPayment(
+          this.dummyOrder.razorpayOrderId,
+          'dummy_payment_id_' + Math.random().toString(36).substr(2, 9),
+          'dummy_signature'
+        );
+      }
+    }, 150); // Total duration ~3 seconds
   }
 
   /**
@@ -241,7 +607,7 @@ export class BookingSummaryComponent implements OnInit {
       name: 'BookMyShow Clone',
       description: `Booking #${this.bookingId}`,
       order_id: order.razorpayOrderId,
-      theme: { color: '#E23744' },
+      theme: { color: '#F43F5E' },
       handler: (response: any) => {
         // Payment captured by Razorpay — verify signature on backend
         this.verifyPayment(
