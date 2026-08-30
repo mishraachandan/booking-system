@@ -22,7 +22,11 @@ const CITY_NAME_KEY = 'selectedCityName';
           <p class="hero-subtitle">Book movie tickets, explore shows, and grab the best seats in town.</p>
 
           <div class="city-selector">
-            <select [(ngModel)]="selectedCityId" (change)="onCityChange()" class="city-dropdown" aria-label="Select City">
+            <select
+              [ngModel]="selectedCityId()"
+              (ngModelChange)="onCityChange($event)"
+              class="city-dropdown"
+              aria-label="Select City">
               <option [value]="0">📍 Select your city</option>
               @for (city of cities; track city.id) {
                 <option [value]="city.id">{{ city.name }}</option>
@@ -38,7 +42,7 @@ const CITY_NAME_KEY = 'selectedCityName';
           <h2>🎬 Now Showing</h2>
           <p class="text-muted">
             @if (!cityWarning && movies.length > 0) {
-              {{ filteredMovies.length }} of {{ movies.length }} movies available
+              {{ filteredMovies.length }} of {{ movies.length }} movies in {{ selectedCityName() || 'your city' }}
             } @else {
               No movies available
             }
@@ -65,7 +69,7 @@ const CITY_NAME_KEY = 'selectedCityName';
         } @else if (movies.length === 0) {
           <div class="empty-state">
             <span class="empty-icon">🎭</span>
-            <p>No movies found for this city. Check back later!</p>
+            <p>No movies found for {{ selectedCityName() || 'this city' }}. Check back later!</p>
           </div>
         } @else {
           <!-- Search & Filters -->
@@ -113,7 +117,7 @@ const CITY_NAME_KEY = 'selectedCityName';
                 <div class="card movie-card" (click)="selectMovie(movie)">
                   <div class="poster-wrap">
                     <img [src]="movie.posterUrl || 'https://placehold.co/300x450/1a1a2e/e23744?text=' + movie.title"
-                         [alt]="movie.title" class="poster" />
+                         [alt]="movie.title" class="poster" loading="lazy" />
                     <div class="poster-overlay">
                       <span class="badge-lang">{{ movie.language || 'EN' }}</span>
                     </div>
@@ -156,8 +160,8 @@ const CITY_NAME_KEY = 'selectedCityName';
             <div class="shows-grid">
               @for (show of movieShows; track show.id) {
                 <a [routerLink]="['/show', show.id, 'seats']" class="card show-card">
-                  <div class="show-cinema">{{ show.screen?.cinema?.name || 'Cinema' }}</div>
-                  <div class="show-screen">{{ show.screen?.name || 'Screen' }}</div>
+                  <div class="show-cinema">{{ show.screen && show.screen.cinema ? show.screen.cinema.name : 'Cinema' }}</div>
+                  <div class="show-screen">{{ show.screen ? show.screen.name : 'Screen' }}</div>
                   <div class="show-time">{{ show.startTime | date:'hh:mm a' }}</div>
                   <div class="show-date">{{ show.startTime | date:'MMM d, yyyy' }}</div>
                 </a>
@@ -442,13 +446,12 @@ const CITY_NAME_KEY = 'selectedCityName';
 })
 export class HomeComponent implements OnInit {
   cities: City[] = [];
-  selectedCityId = 0;
   shows: Show[] = [];
   movies: Movie[] = [];
   movieShows: Show[] = [];
   selectedMovie: Movie | null = null;
   loading = false;
-  cityWarning = true;
+  cityWarning = false;
 
   // Filter & Search states
   searchTerm = '';
@@ -459,6 +462,9 @@ export class HomeComponent implements OnInit {
   genres: string[] = [];
   languages: string[] = [];
 
+  get selectedCityId() { return this.cityService.selectedCityId; }
+  get selectedCityName() { return this.cityService.selectedCityName; }
+
   constructor(
     private showService: ShowService,
     private cityService: CityService,
@@ -468,20 +474,23 @@ export class HomeComponent implements OnInit {
   ngOnInit() {
     this.cityService.getCities().subscribe(c => {
       this.cities = c;
-
-      // Restore previously selected city from localStorage
-      const savedCityId = Number(localStorage.getItem(CITY_ID_KEY)) || 0;
-      if (savedCityId > 0 && c.some(city => city.id === savedCityId)) {
-        this.selectedCityId = savedCityId;
-        this.cityWarning = false;
+      if (this.selectedCityId() > 0) {
         this.loadShows();
+      } else {
+        this.cityWarning = true;
       }
     });
   }
 
   loadShows() {
+    const cityId = this.selectedCityId();
+    if (cityId === 0) {
+      this.cityWarning = true;
+      return;
+    }
+    this.cityWarning = false;
     this.loading = true;
-    this.showService.getAllShows(this.selectedCityId).subscribe({
+    this.showService.getAllShows(cityId).subscribe({
       next: (shows) => {
         this.shows = shows;
         // Extract unique movies from shows
@@ -547,23 +556,22 @@ export class HomeComponent implements OnInit {
     return list;
   }
 
-  onCityChange() {
+  onCityChange(newCityId: any) {
+    const id = Number(newCityId);
     this.selectedMovie = null;
     this.movieShows = [];
-    this.cityWarning = this.selectedCityId == 0;
     this.searchTerm = '';
     this.selectedGenre = '';
     this.selectedLanguage = '';
 
-    if (!this.cityWarning) {
-      // Persist the selection to localStorage
-      localStorage.setItem(CITY_ID_KEY, String(this.selectedCityId));
-      const cityName = this.cities.find(c => c.id === Number(this.selectedCityId))?.name || '';
-      localStorage.setItem(CITY_NAME_KEY, cityName);
+    const found = this.cities.find(c => c.id === id);
+    if (found) {
+      this.cityService.setCity(found.id, found.name);
+      this.cityWarning = false;
       this.loadShows();
     } else {
-      localStorage.removeItem(CITY_ID_KEY);
-      localStorage.removeItem(CITY_NAME_KEY);
+      this.cityService.setCity(0, '');
+      this.cityWarning = true;
       this.shows = [];
       this.movies = [];
       this.genres = [];
@@ -572,7 +580,7 @@ export class HomeComponent implements OnInit {
   }
 
   selectMovie(movie: Movie) {
-    if (this.selectedCityId == 0) {
+    if (this.selectedCityId() === 0) {
       this.cityWarning = true;
       return;
     }
@@ -580,3 +588,4 @@ export class HomeComponent implements OnInit {
     this.router.navigate(['/movies', movie.id]);
   }
 }
+

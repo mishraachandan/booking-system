@@ -113,8 +113,8 @@ input, select, textarea {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideUp {
@@ -145,7 +145,7 @@ input, select, textarea {
 }
 
 .page-enter {
-  animation: fadeIn 0.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+  animation: fadeIn 0.35s ease forwards;
 }
 
 .skeleton {

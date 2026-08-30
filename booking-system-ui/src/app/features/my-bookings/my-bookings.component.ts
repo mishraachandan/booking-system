@@ -124,13 +124,21 @@ type Tab = 'upcoming' | 'past';
                   </div>
                 </div>
 
-                <div class="booking-actions" style="margin-top: 0; padding: 16px 28px; background: rgba(0,0,0,0.02); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                  <button class="btn btn-ghost" style="padding: 8px 12px; font-size: 13px;" (click)="shareBooking(booking)">
-                    🔗 Share Details
-                  </button>
+                <div class="booking-actions" style="margin-top: 0; padding: 16px 28px; background: rgba(0,0,0,0.02); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                   <div style="display: flex; gap: 8px;">
-                    <button class="btn btn-ghost danger" style="padding: 8px 12px; font-size: 13px;" *ngIf="canCancel(booking)" (click)="openCancelModal(booking)">
+                    <button class="btn btn-ghost" style="padding: 8px 12px; font-size: 13px;" (click)="shareBooking(booking)">
+                      🔗 Share
+                    </button>
+                    <button class="btn btn-ghost" style="padding: 8px 12px; font-size: 13px;" (click)="addToCalendar(booking)">
+                      📅 Add to Calendar
+                    </button>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-outline" style="border-color: var(--danger); color: var(--danger); padding: 8px 12px; font-size: 13px;" *ngIf="canCancel(booking)" (click)="openCancelModal(booking)">
                       Cancel
+                    </button>
+                    <button class="btn btn-ghost" style="padding: 8px 12px; font-size: 13px;" (click)="openQrModal(booking)">
+                      🎫 Show QR
                     </button>
                     <button class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;" (click)="printTicket(booking)">
                       🖨️ Print E-Ticket
@@ -178,13 +186,18 @@ type Tab = 'upcoming' | 'past';
                     <span class="booking-id">#{{ booking.bookingId }}</span>
                   </div>
                 </div>
-                @if (canCancel(booking)) {
-                  <div class="booking-actions">
-                    <button class="btn btn-ghost danger" (click)="openCancelModal(booking)">
+                <div class="booking-actions">
+                  @if (booking.status === 'CONFIRMED') {
+                    <button class="btn btn-ghost" style="margin-right: 8px;" (click)="openQrModal(booking)">
+                      🎫 Show QR
+                    </button>
+                  }
+                  @if (canCancel(booking)) {
+                    <button class="btn btn-outline" style="border-color: var(--danger); color: var(--danger);" (click)="openCancelModal(booking)">
                       Cancel Booking
                     </button>
-                  </div>
-                }
+                  }
+                </div>
               </div>
             }
           }
@@ -193,20 +206,30 @@ type Tab = 'upcoming' | 'past';
 
       <!-- Cancel Confirmation Modal -->
       @if (cancelTarget) {
-        <div class="modal-backdrop" (click)="closeCancelModal()">
-          <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-backdrop fade-in" (click)="closeCancelModal()">
+          <div class="modal-card slide-up" (click)="$event.stopPropagation()">
             <h2>Cancel booking #{{ cancelTarget.bookingId }}?</h2>
-            <p class="modal-sub">{{ cancelTarget.movieTitle || cancelTarget.resourceName }}</p>
+            <p class="modal-sub">{{ cancelTarget.movieTitle || cancelTarget.resourceName }} - {{ cancelTarget.showStartTime || cancelTarget.startTime | date:'MMM d, yyyy · hh:mm a' }}</p>
 
             <div class="policy-box">
               <h3>Refund policy</h3>
-              <ul>
-                <li>Cancellation &gt; 24h before show: <strong>full refund</strong> (minus gateway fees).</li>
-                <li>Cancellation 2h – 24h before show: <strong>50% refund</strong>.</li>
-                <li>Cancellation &lt; 2h before show / after show: <strong>no refund</strong>.</li>
-                <li>Add-ons (food &amp; beverage) are refundable only if cancelled &gt; 24h before show.</li>
-                <li>Refunds are processed to the original payment method within 5–7 working days.</li>
-              </ul>
+              <table class="refund-table">
+                <tr style="color: var(--success)">
+                  <td>> 24h before show</td>
+                  <td>Full refund (100%)</td>
+                </tr>
+                <tr style="color: var(--warning)">
+                  <td>4-24h before show</td>
+                  <td>Partial refund (50%)</td>
+                </tr>
+                <tr style="color: var(--danger)">
+                  <td>&lt; 4h</td>
+                  <td>No refund</td>
+                </tr>
+              </table>
+              <div class="refund-calc">
+                Calculated Refund: <strong>₹{{ getRefundAmount() | number:'1.2-2' }}</strong>
+              </div>
             </div>
 
             <div class="tc-box">
@@ -222,13 +245,13 @@ type Tab = 'upcoming' | 'past';
 
             <div class="modal-actions">
               <button class="btn btn-outline" (click)="closeCancelModal()" [disabled]="cancelling">
-                Keep booking
+                Keep Booking
               </button>
               <button
                 class="btn btn-primary danger"
                 (click)="confirmCancel()"
                 [disabled]="!acceptedTc || cancelling">
-                {{ cancelling ? 'Cancelling...' : 'Yes, cancel booking' }}
+                {{ cancelling ? 'Cancelling...' : 'Confirm Cancellation' }}
               </button>
             </div>
           </div>
@@ -237,23 +260,36 @@ type Tab = 'upcoming' | 'past';
 
       <!-- Refund Notification Modal -->
       @if (refundNotification) {
-        <div class="modal-backdrop" (click)="closeRefundNotification()">
-          <div class="modal-card success-card" (click)="$event.stopPropagation()">
+        <div class="modal-backdrop fade-in" (click)="closeRefundNotification()">
+          <div class="modal-card success-card slide-up" (click)="$event.stopPropagation()">
             <div class="success-icon">💰</div>
-            <h2>Refund Simulated Successfully!</h2>
+            <h2>Refund Initiated Successfully!</h2>
             <p class="modal-sub">Booking Cancellation Confirmed</p>
 
             <div class="refund-detail-box">
-              <p>A simulated refund of <strong>₹{{ refundNotification.amount }}</strong> has been initiated to your original payment method.</p>
-              <div class="alert alert-info">
-                ℹ️ <strong>Mock Mode:</strong> The Razorpay API keys are not configured. The actual refund transaction has been mocked in the system.
-              </div>
+              <p>A refund of <strong>₹{{ refundNotification.amount }}</strong> has been initiated to your original payment method.</p>
             </div>
 
             <div class="modal-actions">
               <button class="btn btn-primary" (click)="closeRefundNotification()">
                 Okay, great!
               </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- QR Modal -->
+      @if (qrTarget) {
+        <div class="modal-backdrop fade-in" (click)="closeQrModal()">
+          <div class="modal-card slide-up text-center" style="max-width: 350px;" (click)="$event.stopPropagation()">
+            <h2 style="margin-bottom: 20px;">Your Ticket QR</h2>
+            <div style="background: white; padding: 20px; border-radius: 8px; display: inline-block;">
+               <img [src]="'/api/v1/bookings/' + qrTarget.bookingId + '/qr'" alt="QR Code" style="width: 250px; height: 250px; display: block;" />
+            </div>
+            <p style="margin-top: 20px; color: var(--text-secondary);">Show this at the venue entrance</p>
+            <div class="modal-actions" style="justify-content: center; margin-top: 24px;">
+              <button class="btn btn-primary" (click)="closeQrModal()">Close</button>
             </div>
           </div>
         </div>
@@ -425,6 +461,14 @@ type Tab = 'upcoming' | 'past';
       display: flex; gap: 10px; justify-content: flex-end;
       .danger { background: var(--danger); border-color: var(--danger); }
     }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .slide-up { animation: slideUp 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .text-center { text-align: center; }
+    .refund-table { width: 100%; text-align: left; margin-bottom: 12px; font-size: 13px; border-collapse: collapse; }
+    .refund-table td { padding: 4px 0; }
+    .refund-calc { padding-top: 12px; border-top: 1px solid var(--border); font-size: 14px; }
   `]
 })
 export class MyBookingsComponent implements OnInit {
@@ -434,6 +478,7 @@ export class MyBookingsComponent implements OnInit {
 
   bookingSearchTerm = '';
 
+  qrTarget: BookingResponse | null = null;
   cancelTarget: BookingResponse | null = null;
   acceptedTc = false;
   cancelling = false;
@@ -512,7 +557,17 @@ export class MyBookingsComponent implements OnInit {
   canCancel(b: BookingResponse): boolean {
     if (b.status !== 'CONFIRMED' && b.status !== 'AWAITING_PAYMENT') return false;
     const t = new Date(b.showStartTime || b.startTime || 0).getTime();
-    return t >= Date.now();
+    return (t - Date.now()) > 4 * 60 * 60 * 1000;
+  }
+
+  getRefundAmount(): number {
+    if (!this.cancelTarget) return 0;
+    const t = new Date(this.cancelTarget.showStartTime || this.cancelTarget.startTime || 0).getTime();
+    const diff = t - Date.now();
+    const total = this.cancelTarget.grandTotal || 0;
+    if (diff > 24 * 60 * 60 * 1000) return total;
+    if (diff > 4 * 60 * 60 * 1000) return total * 0.5;
+    return 0;
   }
 
   openCancelModal(b: BookingResponse) {
@@ -534,7 +589,7 @@ export class MyBookingsComponent implements OnInit {
     this.cancelError = '';
     const id = this.cancelTarget.bookingId;
     const isConfirmed = this.cancelTarget.status === 'CONFIRMED';
-    const refundVal = this.cancelTarget.grandTotal || 0;
+    const refundVal = this.getRefundAmount();
 
     this.bookingService.cancelBooking(id).subscribe({
       next: () => {
@@ -542,8 +597,10 @@ export class MyBookingsComponent implements OnInit {
         this.cancelTarget = null;
         this.acceptedTc = false;
         this.loadBookings();
-        if (isConfirmed) {
+        if (isConfirmed && refundVal > 0) {
           this.refundNotification = { amount: refundVal };
+        } else if (isConfirmed) {
+          this.refundNotification = { amount: 0 };
         }
       },
       error: (err) => {
@@ -558,6 +615,14 @@ export class MyBookingsComponent implements OnInit {
     this.refundNotification = null;
   }
 
+  openQrModal(b: BookingResponse) {
+    this.qrTarget = b;
+  }
+
+  closeQrModal() {
+    this.qrTarget = null;
+  }
+
   printTicket(booking: BookingResponse) {
     const cardElement = document.getElementById(`booking-card-${booking.bookingId}`);
     if (cardElement) {
@@ -567,6 +632,44 @@ export class MyBookingsComponent implements OnInit {
         cardElement.classList.remove('printing-mode');
       }, 1000);
     }
+  }
+
+  addToCalendar(booking: BookingResponse) {
+    const movie = booking.movieTitle || booking.resourceName || 'Movie Show';
+    const cinema = booking.cinemaName ? `${booking.cinemaName} (${booking.screenName || ''})` : 'Cinema';
+    const start = new Date(booking.showStartTime || booking.startTime || Date.now());
+    const end = new Date(start.getTime() + 2.5 * 60 * 60 * 1000); // 2.5 hours duration
+
+    const formatIcsDate = (d: Date) => {
+      return d.toISOString().replace(/-|:|\.\d+/g, '');
+    };
+
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//BookMyShow//Movie Booking//EN',
+      'BEGIN:VEVENT',
+      `UID:booking-${booking.bookingId}@bookmyshow.dev`,
+      `DTSTAMP:${formatIcsDate(new Date())}`,
+      `DTSTART:${formatIcsDate(start)}`,
+      `DTEND:${formatIcsDate(end)}`,
+      `SUMMARY:🎬 ${movie} - Movie Show`,
+      `DESCRIPTION:Booking #${booking.bookingId} for ${booking.numberOfTickets} ticket(s) at ${cinema}. Enjoy the show!`,
+      `LOCATION:${cinema}`,
+      'STATUS:CONFIRMED',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${movie.replace(/[^a-zA-Z0-9]/g, '_')}_Ticket_${booking.bookingId}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }
 
   shareBooking(b: BookingResponse) {

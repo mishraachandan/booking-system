@@ -19,6 +19,8 @@ public interface ShowSeatRepository extends JpaRepository<ShowSeat, Long> {
 
     List<ShowSeat> findByShowIdAndStatus(Long showId, SeatStatus status);
 
+    List<ShowSeat> findByStatusAndLockedAtBefore(SeatStatus status, LocalDateTime lockedAt);
+
     /**
      * Flat DTO query — single SQL join, zero lazy loading, no proxy issues.
      */

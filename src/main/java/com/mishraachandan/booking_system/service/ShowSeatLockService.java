@@ -191,28 +191,24 @@ public class ShowSeatLockService {
      * Scheduled task to release expired seat locks.
      * Evaluates both DB state and Redis lock existence.
      */
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedDelay = 60000)
     @Transactional
     public void releaseExpiredLocks() {
-        // Query locked seats from DB
         LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(LOCK_TIMEOUT_MINUTES);
-        List<ShowSeat> dbLockedSeats = showSeatRepository.findExpiredLocks(cutoffTime);
+        List<ShowSeat> dbLockedSeats = showSeatRepository.findByStatusAndLockedAtBefore(SeatStatus.LOCKED, cutoffTime);
 
         int releasedCount = 0;
         for (ShowSeat ss : dbLockedSeats) {
-            // If the Redis lock key is gone, heal/release DB status
-            if (!redisLockService.isLocked(ss.getId())) {
-                ss.setStatus(SeatStatus.AVAILABLE);
-                ss.setLockedAt(null);
-                ss.setLockedByUserId(null);
-                showSeatRepository.save(ss);
-                seatWebSocketHandler.broadcastSeatStatus(ss.getShow().getId(), ss.getId(), "AVAILABLE", null);
-                releasedCount++;
-            }
+            ss.setStatus(SeatStatus.AVAILABLE);
+            ss.setLockedAt(null);
+            ss.setLockedByUserId(null);
+            showSeatRepository.save(ss);
+            seatWebSocketHandler.broadcastSeatStatus(ss.getShow().getId(), ss.getId(), "AVAILABLE", null);
+            releasedCount++;
         }
 
         if (releasedCount > 0) {
-            logger.info("Released {} expired seat locks using Redis TTL check", releasedCount);
+            logger.info("Released {} expired seat locks", releasedCount);
         }
     }
 }

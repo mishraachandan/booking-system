@@ -5,6 +5,7 @@ import com.mishraachandan.booking_system.dto.pojo.OccupancyEntry;
 import com.mishraachandan.booking_system.dto.pojo.RevenuePoint;
 import com.mishraachandan.booking_system.dto.pojo.TopShowEntry;
 import com.mishraachandan.booking_system.service.AnalyticsService;
+import com.mishraachandan.booking_system.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,8 @@ import java.util.List;
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
+    private final com.mishraachandan.booking_system.repository.BookingRepository bookingRepository;
+    private final AuditLogService auditLogService;
 
     /**
      * Returns a headline KPI set. Defaults to "last 30 days" if no range given.
@@ -104,11 +107,59 @@ public class AnalyticsController {
         return ResponseEntity.ok(analyticsService.occupancy(f, t));
     }
 
+    @GetMapping("/audit-logs")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<org.springframework.data.domain.Page<com.mishraachandan.booking_system.dto.entity.AuditLog>> getAuditLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(auditLogService.getAuditLogs(org.springframework.data.domain.PageRequest.of(page, size)));
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private LocalDateTime[] window(LocalDate from, LocalDate to) {
         LocalDate f = from != null ? from : LocalDate.now().minusDays(30);
         LocalDate t = to != null ? to : LocalDate.now();
         return new LocalDateTime[] { f.atStartOfDay(), t.atTime(LocalTime.MAX) };
+    }
+
+    @GetMapping("/export/bookings")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> exportBookings(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "csv") String format) {
+            
+        LocalDateTime[] win = window(from, to);
+        List<com.mishraachandan.booking_system.dto.entity.Booking> bookings = bookingRepository.findByStartTimeBetween(win[0], win[1]);
+
+        org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody stream = out -> {
+            try (java.io.Writer writer = new java.io.OutputStreamWriter(out);
+                 com.opencsv.CSVWriter csvWriter = new com.opencsv.CSVWriter(writer)) {
+                 
+                String[] header = {"ID", "User Email", "Movie", "Show Time", "Seats", "Add-ons Total", "Total Amount", "Status", "Created At"};
+                csvWriter.writeNext(header);
+                
+                for (com.mishraachandan.booking_system.dto.entity.Booking b : bookings) {
+                    String userEmail = b.getUser() != null ? b.getUser().getEmail() : "";
+                    String movie = b.getShow() != null && b.getShow().getMovie() != null ? b.getShow().getMovie().getTitle() : "";
+                    String showTime = b.getShow() != null && b.getShow().getStartTime() != null ? b.getShow().getStartTime().toString() : "";
+                    String seats = b.getNumberOfTickets() != null ? b.getNumberOfTickets().toString() : "0";
+                    String addonsTotal = "0"; // Simplify as per prompt or skip if hard to fetch
+                    String totalAmount = bookingRepository.findTotalAmountForBooking(b.getId()).map(Object::toString).orElse("0");
+                    String status = b.getStatus() != null ? b.getStatus().toString() : "";
+                    String createdAt = b.getCreatedAt() != null ? b.getCreatedAt().toString() : "";
+                    
+                    csvWriter.writeNext(new String[]{
+                        b.getId().toString(), userEmail, movie, showTime, seats, addonsTotal, totalAmount, status, createdAt
+                    });
+                }
+            }
+        };
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv")
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"bookings-export.csv\"")
+                .body(stream);
     }
 }

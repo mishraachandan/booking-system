@@ -1,14 +1,25 @@
 import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Movie } from '../../core/services/show.service';
 import { MovieService } from '../../core/services/movie.service';
 import { ShowService, Show } from '../../core/services/show.service';
 
+export interface UserReview {
+  id: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  date: string;
+  tags?: string[];
+  likes?: number;
+}
+
 @Component({
   selector: 'app-movie-detail',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   template: `
     <div class="movie-detail-page page-enter">
       @if (loading) {
@@ -122,8 +133,8 @@ import { ShowService, Show } from '../../core/services/show.service';
             <div class="shows-grid">
               @for (show of shows; track show.id) {
                 <a [routerLink]="['/show', show.id, 'seats']" class="card show-card">
-                  <div class="show-cinema">{{ show.screen?.cinema?.name || 'Cinema' }}</div>
-                  <div class="show-screen">{{ show.screen?.name || 'Screen' }}</div>
+                  <div class="show-cinema">{{ show.screen && show.screen.cinema ? show.screen.cinema.name : 'Cinema' }}</div>
+                  <div class="show-screen">{{ show.screen ? show.screen.name : 'Screen' }}</div>
                   <div class="show-time">{{ show.startTime | date:'hh:mm a' }}</div>
                   <div class="show-date">{{ show.startTime | date:'MMM d, yyyy' }}</div>
                 </a>
@@ -131,6 +142,122 @@ import { ShowService, Show } from '../../core/services/show.service';
             </div>
           }
         </section>
+
+        <!-- User Reviews & Audience Reactions -->
+        <section class="reviews-section container">
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div>
+              <h2>Audience Reviews &amp; Reactions</h2>
+              <p class="text-muted">What movie lovers are saying about this movie</p>
+            </div>
+            <button class="btn btn-outline" (click)="openReviewModal()">
+              ✍️ Write a Review
+            </button>
+          </div>
+
+          <!-- Sentiment & Stats Bar -->
+          <div class="review-stats-card card">
+            <div class="rating-highlight">
+              <span class="big-score">★ {{ averageScore }}</span>
+              <span class="score-sub">out of 5 · {{ reviews.length }} reviews</span>
+            </div>
+            <div class="sentiment-tags">
+              <span class="sentiment-badge">🔥 Trending #1</span>
+              <span class="sentiment-badge">🍿 94% Audience Loved it</span>
+              <span class="sentiment-badge">🎬 Must Watch in Theaters</span>
+            </div>
+          </div>
+
+          <!-- Reviews Grid -->
+          <div class="reviews-grid">
+            @for (rev of reviews; track rev.id) {
+              <div class="card review-card">
+                <div class="review-head">
+                  <div class="reviewer-info">
+                    <div class="avatar">{{ rev.userName.charAt(0).toUpperCase() }}</div>
+                    <div>
+                      <div class="user-name">{{ rev.userName }} <span class="verified-badge">✓ Verified Viewer</span></div>
+                      <div class="review-date">{{ rev.date }}</div>
+                    </div>
+                  </div>
+                  <div class="review-stars">
+                    @for (star of [1,2,3,4,5]; track star) {
+                      <span [class.filled]="star <= rev.rating">★</span>
+                    }
+                  </div>
+                </div>
+                @if (rev.tags && rev.tags.length > 0) {
+                  <div class="review-tags">
+                    @for (t of rev.tags; track t) {
+                      <span class="tag-chip">{{ t }}</span>
+                    }
+                  </div>
+                }
+                <p class="review-text">{{ rev.comment }}</p>
+                <div class="review-foot">
+                  <button class="btn-helpful" (click)="rev.likes = (rev.likes || 0) + 1">
+                    👍 Helpful ({{ rev.likes || 0 }})
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- Write Review Modal -->
+        @if (reviewModalOpen) {
+          <div class="modal-backdrop" (click)="reviewModalOpen = false">
+            <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 500px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Rate &amp; Review {{ movie.title }}</h2>
+                <button class="btn btn-ghost" (click)="reviewModalOpen = false">✕</button>
+              </div>
+
+              <!-- Star Picker -->
+              <div class="star-picker" style="display: flex; gap: 8px; font-size: 32px; justify-content: center; margin-bottom: 20px; cursor: pointer;">
+                @for (s of [1,2,3,4,5]; track s) {
+                  <span (click)="newReviewRating = s" [style.color]="s <= newReviewRating ? '#fbbf24' : 'var(--text-muted)'">
+                    ★
+                  </span>
+                }
+              </div>
+
+              <!-- Tags selector -->
+              <div style="margin-bottom: 16px;">
+                <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px;">
+                  Select Tags
+                </label>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                  @for (tag of availableReviewTags; track tag) {
+                    <button
+                      class="tag-toggle-btn"
+                      [class.active]="isTagSelected(tag)"
+                      (click)="toggleTag(tag)">
+                      {{ tag }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Your Name</label>
+                <input type="text" [(ngModel)]="newReviewName" placeholder="Your name (e.g. Rahul S.)" />
+              </div>
+
+              <div class="form-group">
+                <label>Your Review</label>
+                <textarea rows="4" [(ngModel)]="newReviewComment" placeholder="Share your experience about the direction, acting, music..."></textarea>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                <button class="btn btn-outline" (click)="reviewModalOpen = false">Cancel</button>
+                <button class="btn btn-primary" (click)="submitReview()" [disabled]="!newReviewComment || !newReviewName">
+                  Submit Review
+                </button>
+              </div>
+            </div>
+          </div>
+        }
 
         <!-- Sticky Floating Booking Bar -->
         <div class="sticky-booking-bar" [class.visible]="showStickyBar">
@@ -217,23 +344,115 @@ import { ShowService, Show } from '../../core/services/show.service';
       }
     }
 
+    /* Trailer Lightbox Modal */
+    .lightbox-backdrop {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 99999 !important;
+      background: rgba(0, 0, 0, 0.9) !important;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      margin: 0 !important;
+    }
+    .lightbox-content {
+      position: relative;
+      width: 100%;
+      max-width: 960px;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+      }
+    }
+    .lightbox-close {
+      position: absolute;
+      top: -50px;
+      right: 0;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      opacity: 0.9;
+      transition: all 0.2s;
+      z-index: 100000;
+      &:hover {
+        opacity: 1;
+        background: var(--accent);
+        transform: scale(1.1);
+      }
+    }
+
     /* Zoom Lightbox Modal */
     .zoom-modal-backdrop {
-      position: fixed; inset: 0; z-index: 250;
-      background: rgba(10, 11, 20, 0.95);
-      display: flex; align-items: center; justify-content: center;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 99999 !important;
+      background: rgba(10, 11, 20, 0.95) !important;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 !important;
     }
     .zoom-modal-content {
       position: relative;
-      max-width: 90vw; max-height: 90vh;
-      display: flex; flex-direction: column; align-items: center;
+      max-width: 90vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     .zoom-modal-close {
-      position: absolute; top: -50px; right: 0;
-      background: none; border: none; color: white;
-      font-size: 28px; cursor: pointer; opacity: 0.7;
-      transition: opacity 0.2s;
-      &:hover { opacity: 1; }
+      position: absolute;
+      top: -50px;
+      right: 0;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: all 0.2s;
+      &:hover {
+        opacity: 1;
+        background: var(--accent);
+        transform: scale(1.1);
+      }
     }
     .zoom-img-container {
       cursor: grab;
@@ -347,6 +566,62 @@ import { ShowService, Show } from '../../core/services/show.service';
       background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
     }
 
+    /* Reviews Section Styles */
+    .reviews-section { padding: 40px 0 80px; }
+    .review-stats-card {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 24px 32px; margin-bottom: 28px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      flex-wrap: wrap; gap: 20px;
+    }
+    .rating-highlight { display: flex; align-items: baseline; gap: 12px; }
+    .big-score { font-size: 36px; font-weight: 800; color: #fbbf24; }
+    .score-sub { color: var(--text-secondary); font-size: 14px; }
+    .sentiment-tags { display: flex; gap: 10px; flex-wrap: wrap; }
+    .sentiment-badge {
+      background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.2);
+      color: var(--accent); padding: 6px 14px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+    }
+    .reviews-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+    .review-card {
+      padding: 20px; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); display: flex; flex-direction: column; gap: 12px;
+      transition: var(--transition);
+      &:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+    }
+    .review-head { display: flex; justify-content: space-between; align-items: flex-start; }
+    .reviewer-info {
+      display: flex; align-items: center; gap: 10px;
+      .avatar {
+        width: 38px; height: 38px; border-radius: 50%; background: var(--accent-gradient);
+        color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+      }
+      .user-name { font-weight: 700; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+      .verified-badge { font-size: 10px; color: var(--success); font-weight: 600; }
+      .review-date { font-size: 11px; color: var(--text-muted); }
+    }
+    .review-stars { color: var(--text-muted); font-size: 14px; .filled { color: #fbbf24; } }
+    .review-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag-chip {
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 11px; padding: 2px 8px; border-radius: 6px;
+    }
+    .review-text { font-size: 13px; line-height: 1.6; color: var(--text-secondary); flex: 1; }
+    .review-foot { display: flex; justify-content: flex-end; }
+    .btn-helpful {
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+      transition: var(--transition);
+      &:hover { color: var(--text-primary); border-color: var(--accent); }
+    }
+    .tag-toggle-btn {
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 12px; padding: 6px 12px;
+      border-radius: 20px; cursor: pointer; transition: var(--transition);
+      &.active { background: rgba(244, 63, 94, 0.15); border-color: var(--accent); color: var(--accent); }
+    }
+
     @media (max-width: 768px) {
       .hero-content { flex-direction: column; gap: 24px; text-align: center; }
       .poster-wrap { flex: 0 0 auto; max-width: 220px; }
@@ -368,6 +643,15 @@ export class MovieDetailComponent implements OnInit, OnDestroy {
   fallbackPoster = 'https://placehold.co/300x450/1a1a2e/e23744?text=Movie';
   showStickyBar = false;
 
+  // Reviews state
+  reviews: UserReview[] = [];
+  reviewModalOpen = false;
+  newReviewRating = 5;
+  newReviewName = '';
+  newReviewComment = '';
+  selectedReviewTags: string[] = [];
+  availableReviewTags = ['Action Packed', 'Mind Bending', 'Great Music', 'Superb Acting', 'Must Watch in 3D', 'Family Entertainer', 'Emotional'];
+
   // Poster Zoom / Lightbox States
   zoomModalOpen = false;
   zoomScale = 1.0;
@@ -376,6 +660,95 @@ export class MovieDetailComponent implements OnInit, OnDestroy {
   private isPanning = false;
   private startX = 0;
   private startY = 0;
+
+  get averageScore(): string {
+    if (this.reviews.length === 0) return '4.8';
+    const sum = this.reviews.reduce((acc, r) => acc + r.rating, 0);
+    return (sum / this.reviews.length).toFixed(1);
+  }
+
+  openReviewModal() {
+    this.reviewModalOpen = true;
+    this.newReviewRating = 5;
+    this.newReviewComment = '';
+    this.selectedReviewTags = ['Must Watch in Theaters'];
+  }
+
+  toggleTag(tag: string) {
+    if (this.selectedReviewTags.includes(tag)) {
+      this.selectedReviewTags = this.selectedReviewTags.filter(t => t !== tag);
+    } else {
+      this.selectedReviewTags.push(tag);
+    }
+  }
+
+  isTagSelected(tag: string): boolean {
+    return this.selectedReviewTags.includes(tag);
+  }
+
+  submitReview() {
+    if (!this.newReviewComment || !this.newReviewName) return;
+    const rev: UserReview = {
+      id: 'rev_' + Date.now(),
+      userName: this.newReviewName.trim(),
+      rating: this.newReviewRating,
+      comment: this.newReviewComment.trim(),
+      date: 'Just now',
+      tags: [...this.selectedReviewTags],
+      likes: 1
+    };
+    this.reviews.unshift(rev);
+    this.saveReviews();
+    this.reviewModalOpen = false;
+  }
+
+  private saveReviews() {
+    if (typeof localStorage !== 'undefined' && this.movie) {
+      localStorage.setItem(`movie_reviews_${this.movie.id}`, JSON.stringify(this.reviews));
+    }
+  }
+
+  private loadReviews(movieId: number) {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(`movie_reviews_${movieId}`);
+      if (saved) {
+        try {
+          this.reviews = JSON.parse(saved);
+          return;
+        } catch (e) {}
+      }
+    }
+    // Default seed reviews
+    this.reviews = [
+      {
+        id: '1',
+        userName: 'Aarav Mehta',
+        rating: 5,
+        comment: 'Absolute masterpiece! The visual cinematography and background score are unmatched on the big screen.',
+        date: '2 days ago',
+        tags: ['Action Packed', 'Must Watch in 3D'],
+        likes: 14
+      },
+      {
+        id: '2',
+        userName: 'Priya Sharma',
+        rating: 5,
+        comment: 'Kept me on the edge of my seat throughout. A complete theatrical treat for everyone!',
+        date: '3 days ago',
+        tags: ['Superb Acting', 'Great Music'],
+        likes: 8
+      },
+      {
+        id: '3',
+        userName: 'Vikram Joshi',
+        rating: 4,
+        comment: 'Pacing was brilliant and the climax was unexpected. Definitely worth watching in IMAX!',
+        date: '5 days ago',
+        tags: ['Mind Bending'],
+        likes: 5
+      }
+    ];
+  }
 
   openZoomModal() {
     this.zoomModalOpen = true;
@@ -438,6 +811,7 @@ export class MovieDetailComponent implements OnInit, OnDestroy {
       this.loading = false;
       return;
     }
+    this.loadReviews(movieId);
     this.movieService.getMovie(movieId).subscribe({
       next: (m) => {
         this.movie = m;

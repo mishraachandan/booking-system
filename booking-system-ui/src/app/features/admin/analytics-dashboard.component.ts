@@ -18,7 +18,7 @@ type TabKey = 'overview' | 'revenue' | 'top' | 'occupancy';
   standalone: true,
   imports: [CommonModule, DecimalPipe],
   template: `
-    <div class="chart" *ngIf="rows?.length; else empty">
+    <div class="chart" *ngIf="rows.length; else empty">
       <div class="row" *ngFor="let r of rows">
         <div class="lbl" [title]="r.label">{{ r.label }}</div>
         <div class="track"><div class="fill" [style.width.%]="pct(r.revenue)"></div></div>
@@ -47,9 +47,74 @@ export class BarChartComponent {
 }
 
 @Component({
+  selector: 'app-svg-line-chart',
+  standalone: true,
+  imports: [CommonModule, DecimalPipe],
+  template: `
+    <div class="svg-container" *ngIf="points.length > 0; else empty">
+      <svg viewBox="0 0 600 200" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#6366f1" stop-opacity="0.3" />
+            <stop offset="100%" stop-color="#6366f1" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <path [attr.d]="areaPath" fill="url(#lineGrad)" />
+        <path [attr.d]="linePath" fill="none" stroke="#6366f1" stroke-width="3" />
+        <g *ngFor="let p of points">
+          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="5" fill="var(--bg-card)" stroke="#6366f1" stroke-width="2" />
+          <title>{{ p.label }}: ₹{{ p.val | number:'1.2-2' }}</title>
+        </g>
+      </svg>
+      <div class="x-axis">
+        <span *ngFor="let p of points">{{ p.label }}</span>
+      </div>
+    </div>
+    <ng-template #empty><p class="empty">No data.</p></ng-template>
+  `,
+  styles: [`
+    .svg-container { width: 100%; position: relative; }
+    svg { width: 100%; height: 200px; overflow: visible; }
+    .x-axis { display: flex; justify-content: space-between; margin-top: 15px; font-size: 11px; color: var(--text-muted); }
+    .empty { color: var(--text-muted); font-size: 13px; }
+  `]
+})
+export class SvgLineChartComponent {
+  @Input() data: RevenuePoint[] = [];
+  
+  get points() {
+    if (!this.data || this.data.length === 0) return [];
+    const maxVal = Math.max(...this.data.map(d => d.revenue), 1);
+    const width = 600;
+    const height = 180;
+    
+    return this.data.map((d, i) => {
+      const x = this.data.length === 1 ? width / 2 : (i / (this.data.length - 1)) * width;
+      const y = height - (d.revenue / maxVal) * height + 10;
+      return { x, y, label: (d.label || '').split(' ')[0], val: d.revenue };
+    });
+  }
+  
+  get linePath() {
+    const pts = this.points;
+    if (pts.length === 0) return '';
+    return 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ');
+  }
+  
+  get areaPath() {
+    const pts = this.points;
+    if (pts.length === 0) return '';
+    const start = `M ${pts[0].x},200 L ${pts[0].x},${pts[0].y}`;
+    const line = pts.map(p => `L ${p.x},${p.y}`).join(' ');
+    const end = `L ${pts[pts.length - 1].x},200 Z`;
+    return `${start} ${line} ${end}`;
+  }
+}
+
+@Component({
   selector: 'app-analytics-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe, DecimalPipe, BarChartComponent],
+  imports: [CommonModule, FormsModule, DatePipe, DecimalPipe, BarChartComponent, SvgLineChartComponent],
   template: `
     <div class="dash">
       <div class="dash-header">
@@ -61,6 +126,7 @@ export class BarChartComponent {
           <label>From <input type="date" [(ngModel)]="fromDate" (change)="reload()" /></label>
           <label>To <input type="date" [(ngModel)]="toDate" (change)="reload()" /></label>
           <button class="btn-ghost" (click)="reset()">Last 30 days</button>
+          <button class="btn-ghost" (click)="exportCsv()" style="background: var(--bg-card);">📥 Export CSV</button>
         </div>
       </div>
 
@@ -69,25 +135,25 @@ export class BarChartComponent {
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-label">Total Bookings</div>
-          <div class="kpi-value">{{ overview()?.totalBookings ?? '—' }}</div>
+          <div class="kpi-value">{{ overview()?.totalBookings ?? '—' }} <span class="trend up">↑</span></div>
           <div class="kpi-sub">
             {{ overview()?.confirmedBookings ?? 0 }} confirmed · {{ overview()?.cancelledBookings ?? 0 }} cancelled
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Revenue</div>
-          <div class="kpi-value">₹{{ overview()?.totalRevenue | number:'1.0-2' }}</div>
+          <div class="kpi-label">Total Revenue</div>
+          <div class="kpi-value">₹{{ overview()?.totalRevenue | number:'1.0-2' }} <span class="trend up">↑</span></div>
           <div class="kpi-sub">From confirmed bookings</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Avg Ticket</div>
-          <div class="kpi-value">₹{{ overview()?.averageTicketPrice | number:'1.0-2' }}</div>
-          <div class="kpi-sub">Per confirmed booking</div>
+          <div class="kpi-label">Average Occupancy</div>
+          <div class="kpi-value">{{ getAvgOccupancy() | number:'1.0-1' }}% <span class="trend up">↑</span></div>
+          <div class="kpi-sub">Across all shows</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Refund / Cancel Rate</div>
+          <div class="kpi-label">Cancellation Rate</div>
           <div class="kpi-value" [class.warning]="(overview()?.refundRate ?? 0) > 0.1">
-            {{ ((overview()?.refundRate ?? 0) * 100) | number:'1.1-2' }}%
+            {{ ((overview()?.refundRate ?? 0) * 100) | number:'1.1-2' }}% <span class="trend down">↓</span>
           </div>
           <div class="kpi-sub">Cancelled ÷ total</div>
         </div>
@@ -102,7 +168,7 @@ export class BarChartComponent {
       @switch (activeTab()) {
         @case ('revenue') {
           <section class="panel-grid">
-            <div class="panel"><h3>Revenue per day</h3><app-bar-chart [rows]="revenueDaily()"></app-bar-chart></div>
+            <div class="panel" style="grid-column: 1 / -1;"><h3>Revenue last 7 days</h3><app-svg-line-chart [data]="revenueDaily().slice(-7)"></app-svg-line-chart></div>
             <div class="panel"><h3>Revenue per cinema</h3><app-bar-chart [rows]="revenueByCinema()"></app-bar-chart></div>
             <div class="panel"><h3>Revenue per movie</h3><app-bar-chart [rows]="revenueByMovie()"></app-bar-chart></div>
           </section>
@@ -175,8 +241,28 @@ export class BarChartComponent {
         }
         @default {
           <section class="panel-grid">
-            <div class="panel"><h3>Revenue per day</h3><app-bar-chart [rows]="revenueDaily()"></app-bar-chart></div>
-            <div class="panel"><h3>Top 5 movies by revenue</h3><app-bar-chart [rows]="revenueByMovie().slice(0, 5)"></app-bar-chart></div>
+            <div class="panel"><h3>Revenue last 7 days</h3><app-svg-line-chart [data]="revenueDaily().slice(-7)"></app-svg-line-chart></div>
+            <div class="panel">
+              <h3>Top 5 movies by revenue</h3>
+              <table class="tbl">
+                <thead><tr>
+                  <th>Rank</th><th>Movie</th><th>Total Bookings</th><th>Revenue</th><th>Occupancy %</th>
+                </tr></thead>
+                <tbody>
+                  @for (m of getTopMoviesAggregated(); track m.title; let i = $index) {
+                    <tr>
+                      <td>
+                        @if (i === 0) { <span class="badge gold" style="background: gold; color: #000; padding: 2px 6px; border-radius: 10px; font-weight: bold; font-size: 11px;">#1</span> } @else { #{{ i + 1 }} }
+                      </td>
+                      <td>{{ m.title }}</td>
+                      <td>{{ m.bookings }}</td>
+                      <td>₹{{ m.revenue | number:'1.0-2' }}</td>
+                      <td>{{ m.occupancy | number:'1.0-1' }}%</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           </section>
         }
       }
@@ -217,6 +303,9 @@ export class BarChartComponent {
     .bar { position: absolute; top: 0; left: 0; bottom: 0; background: linear-gradient(90deg, #6366f1, #22c55e); }
     .bar-wrap span { position: relative; z-index: 1; font-size: 11px; line-height: 18px; padding-left: 8px; color: var(--text-primary); font-weight: 600; }
     .loading { margin-top: 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
+    .trend { font-size: 14px; font-weight: normal; margin-left: 4px; }
+    .trend.up { color: #22c55e; }
+    .trend.down { color: #ef4444; }
   `]
 })
 export class AnalyticsDashboardComponent implements OnInit {
@@ -251,6 +340,44 @@ export class AnalyticsDashboardComponent implements OnInit {
     this.fromDate = from.toISOString().slice(0, 10);
     this.toDate = today.toISOString().slice(0, 10);
     this.reload();
+  }
+
+  getAvgOccupancy(): number {
+    const occ = this.occupancy();
+    if (!occ || occ.length === 0) return 0;
+    const totalBooked = occ.reduce((sum, o) => sum + (o.bookedSeats || 0), 0);
+    const totalSeats = occ.reduce((sum, o) => sum + (o.totalSeats || 0), 0);
+    return totalSeats > 0 ? (totalBooked / totalSeats) * 100 : 0;
+  }
+
+  getTopMoviesAggregated(): { title: string, bookings: number, revenue: number, occupancy: number }[] {
+    const shows = this.topShows();
+    if (!shows || shows.length === 0) return [];
+    
+    const movieMap = new Map<string, { bookings: number, revenue: number, totalSeats: number, bookedSeats: number }>();
+    for (const s of shows) {
+      if (!s.movieTitle) continue;
+      if (!movieMap.has(s.movieTitle)) {
+        movieMap.set(s.movieTitle, { bookings: 0, revenue: 0, totalSeats: 0, bookedSeats: 0 });
+      }
+      const m = movieMap.get(s.movieTitle)!;
+      m.bookings += 1;
+      m.revenue += (s.revenue || 0);
+      m.totalSeats += (s.totalSeats || 0);
+      m.bookedSeats += (s.bookedSeats || 0);
+    }
+    
+    return Array.from(movieMap.entries()).map(([title, stats]) => ({
+      title,
+      bookings: stats.bookings,
+      revenue: stats.revenue,
+      occupancy: stats.totalSeats > 0 ? (stats.bookedSeats / stats.totalSeats) * 100 : 0
+    })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  }
+
+  exportCsv() {
+    const url = `/api/v1/admin/export/bookings?from=${this.fromDate}&to=${this.toDate}&format=csv`;
+    window.open(url, '_blank');
   }
 
   reload() {

@@ -46,6 +46,45 @@ declare const Razorpay: any;
         } @else {
           <div class="confirm-state">
             <h1>Complete Your Booking</h1>
+
+            <!-- Promo Code / Coupon Section -->
+            <div class="coupon-section">
+              @if (!appliedCoupon) {
+                <div class="coupon-input-wrap">
+                  <span class="coupon-icon">🏷️</span>
+                  <input
+                    type="text"
+                    [(ngModel)]="couponCodeInput"
+                    placeholder="Enter promo code (e.g. FIRST50)"
+                    aria-label="Promo Code" />
+                  <button class="btn btn-primary btn-apply" (click)="applyCoupon(couponCodeInput)">Apply</button>
+                </div>
+
+                @if (couponError) {
+                  <div class="coupon-msg error">{{ couponError }}</div>
+                }
+
+                <div class="coupon-suggestions">
+                  <span class="sugg-label">Available Offers:</span>
+                  <div class="sugg-chips">
+                    <button class="sugg-chip" (click)="applyCoupon('FIRST50')">FIRST50 (₹50 off)</button>
+                    <button class="sugg-chip" (click)="applyCoupon('BMSFREE')">BMSFREE (₹100 off)</button>
+                    @if (addOnTotal > 0) {
+                      <button class="sugg-chip" (click)="applyCoupon('SNACK20')">SNACK20 (20% F&amp;B off)</button>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <div class="applied-coupon-card">
+                  <div class="coupon-left">
+                    <span class="applied-tag">✓ {{ appliedCoupon }}</span>
+                    <span class="applied-desc">{{ appliedCouponDesc }}</span>
+                  </div>
+                  <button class="btn-remove-coupon" (click)="removeCoupon()">✕ Remove</button>
+                </div>
+              }
+            </div>
+
             <div class="details">
               <div class="detail-row">
                 <span>Booking ID</span>
@@ -61,9 +100,15 @@ declare const Razorpay: any;
                   <span>₹{{ addOnTotal }}</span>
                 </div>
               }
+              @if (discountAmount > 0) {
+                <div class="detail-row discount-row">
+                  <span>Discount ({{ appliedCoupon }}) 🎁</span>
+                  <span class="discount-val">− ₹{{ discountAmount }}</span>
+                </div>
+              }
               <div class="detail-row total-row">
                 <span>Total Amount</span>
-                <span class="price">₹{{ total }}</span>
+                <span class="price">₹{{ payableTotal }}</span>
               </div>
             </div>
 
@@ -78,7 +123,7 @@ declare const Razorpay: any;
               class="btn btn-primary full-width pay-btn"
               (click)="startPayment()"
               [disabled]="loading">
-              {{ loading ? 'Opening payment...' : '💳 Pay Now ₹' + total }}
+              {{ loading ? 'Opening payment...' : '💳 Pay Now ₹' + payableTotal }}
             </button>
 
             <p class="cancel-note">
@@ -275,6 +320,95 @@ declare const Razorpay: any;
       margin-top: 8px;
     }
 
+    /* Coupon Section */
+    .coupon-section {
+      margin-bottom: 20px;
+    }
+    .coupon-input-wrap {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px 6px 4px 12px;
+      transition: var(--transition);
+      &:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 10px var(--accent-glow);
+      }
+      .coupon-icon { font-size: 16px; }
+      input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 600;
+        outline: none;
+        text-transform: uppercase;
+        &::placeholder { text-transform: none; color: var(--text-muted); font-weight: 400; }
+      }
+      .btn-apply {
+        padding: 8px 18px;
+        font-size: 13px;
+        border-radius: var(--radius-sm);
+      }
+    }
+    .coupon-msg {
+      font-size: 12px;
+      margin-top: 6px;
+      padding: 0 4px;
+      &.error { color: var(--danger); }
+      &.success { color: var(--success); }
+    }
+    .coupon-suggestions {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      .sugg-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+      .sugg-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+      .sugg-chip {
+        background: rgba(244, 63, 94, 0.06);
+        border: 1px dashed rgba(244, 63, 94, 0.3);
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: var(--transition);
+        &:hover {
+          background: var(--accent);
+          color: white;
+        }
+      }
+    }
+    .applied-coupon-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      .coupon-left { display: flex; flex-direction: column; gap: 2px; }
+      .applied-tag { font-weight: 800; font-size: 13px; color: var(--success); }
+      .applied-desc { font-size: 11px; color: var(--text-secondary); }
+      .btn-remove-coupon {
+        background: none; border: none; color: var(--danger); font-size: 12px;
+        cursor: pointer; font-weight: 600; padding: 4px;
+        &:hover { text-decoration: underline; }
+      }
+    }
+    .discount-row {
+      color: var(--success) !important;
+      font-weight: 600;
+      .discount-val { font-weight: 700; font-size: 16px; color: var(--success); }
+    }
+
     .error-msg {
       background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
       color: var(--danger); padding: 10px; border-radius: var(--radius-sm);
@@ -292,6 +426,59 @@ export class BookingSummaryComponent implements OnInit {
   paymentCancelled = false;
   loading = false;
   error = '';
+
+  // Promo Code Engine State
+  couponCodeInput = '';
+  appliedCoupon = '';
+  appliedCouponDesc = '';
+  discountAmount = 0;
+  couponError = '';
+
+  get payableTotal(): number {
+    return Math.max(0, this.total - this.discountAmount);
+  }
+
+  applyCoupon(code: string) {
+    this.couponError = '';
+    const cleanCode = (code || '').trim().toUpperCase();
+    if (!cleanCode) {
+      this.couponError = 'Please enter a valid coupon code.';
+      return;
+    }
+
+    if (cleanCode === 'FIRST50') {
+      this.discountAmount = 50;
+      this.appliedCoupon = 'FIRST50';
+      this.appliedCouponDesc = 'Flat ₹50 savings on your booking!';
+    } else if (cleanCode === 'BMSFREE') {
+      if (this.total < 400) {
+        this.couponError = 'BMSFREE requires a minimum booking total of ₹400.';
+        return;
+      }
+      this.discountAmount = 100;
+      this.appliedCoupon = 'BMSFREE';
+      this.appliedCouponDesc = 'Flat ₹100 instant discount applied!';
+    } else if (cleanCode === 'SNACK20') {
+      if (this.addOnTotal <= 0) {
+        this.couponError = 'SNACK20 requires food & beverage add-ons in your cart.';
+        return;
+      }
+      this.discountAmount = Math.round(this.addOnTotal * 0.20);
+      this.appliedCoupon = 'SNACK20';
+      this.appliedCouponDesc = '20% off on your food and beverages combo!';
+    } else {
+      this.couponError = `Coupon code "${cleanCode}" is invalid or expired.`;
+      return;
+    }
+  }
+
+  removeCoupon() {
+    this.appliedCoupon = '';
+    this.appliedCouponDesc = '';
+    this.discountAmount = 0;
+    this.couponCodeInput = '';
+    this.couponError = '';
+  }
 
   // Simulated Checkout States
   showDummyCheckout = false;
