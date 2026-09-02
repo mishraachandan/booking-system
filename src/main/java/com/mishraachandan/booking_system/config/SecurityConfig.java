@@ -78,7 +78,8 @@ public class SecurityConfig {
                             "Accept",
                             "Origin",
                             "X-Requested-With",
-                            "X-Trace-Id"
+                            "X-Trace-Id",
+                            "Idempotency-Key"
                     ));
                     corsConfig.setExposedHeaders(java.util.List.of("X-Trace-Id"));
                     corsConfig.setAllowCredentials(true);
