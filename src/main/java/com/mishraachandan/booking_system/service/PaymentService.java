@@ -56,6 +56,8 @@ public class PaymentService {
      * @return Map with: razorpayOrderId, amount (paise), currency, keyId, bookingId
      */
     @Transactional
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "paymentGateway", fallbackMethod = "createOrderFallback")
+    @io.github.resilience4j.retry.annotation.Retry(name = "paymentGateway")
     public Map<String, Object> createOrder(Long bookingId, Long userId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
@@ -248,5 +250,16 @@ public class PaymentService {
         // Sum prices of BOOKED seats linked to this booking
         return bookingRepository.findTotalAmountForBooking(booking.getId())
                 .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * Fallback method when paymentGateway circuit breaker is open or retries are exhausted.
+     */
+    public Map<String, Object> createOrderFallback(Long bookingId, Long userId, Throwable t) {
+        logger.error("Payment gateway circuit breaker tripped for booking {}: {}", bookingId, t.getMessage());
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                "Payment gateway is temporarily unavailable. Please try again in a few moments."
+        );
     }
 }

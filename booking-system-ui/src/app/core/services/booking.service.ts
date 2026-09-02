@@ -45,19 +45,33 @@ export class BookingService {
 
   constructor(private http: HttpClient) {}
 
+  private generateIdempotencyKey(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'idemp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+  }
+
   bookShowSeats(
     showId: number,
     showSeatIds: number[],
     notes?: string,
-    addOns?: BookingAddOnLine[]
+    addOns?: BookingAddOnLine[],
+    idempotencyKey?: string
   ): Observable<BookingResponse> {
+    const key = idempotencyKey || this.generateIdempotencyKey();
     return this.http.post<BookingResponse>(`${this.baseUrl}/show-seats`, {
       showId, showSeatIds, notes, addOns
+    }, {
+      headers: { 'Idempotency-Key': key }
     });
   }
 
-  confirmBooking(bookingId: number): Observable<BookingResponse> {
-    return this.http.post<BookingResponse>(`${this.baseUrl}/${bookingId}/confirm`, {});
+  confirmBooking(bookingId: number, idempotencyKey?: string): Observable<BookingResponse> {
+    const key = idempotencyKey || this.generateIdempotencyKey();
+    return this.http.post<BookingResponse>(`${this.baseUrl}/${bookingId}/confirm`, {}, {
+      headers: { 'Idempotency-Key': key }
+    });
   }
 
   getMyBookings(): Observable<BookingResponse[]> {

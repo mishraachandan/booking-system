@@ -29,6 +29,7 @@ public class PaymentController {
      * Body: { "bookingId": 123 }
      */
     @PostMapping("/create-order")
+    @com.mishraachandan.booking_system.config.idempotency.Idempotent
     public ResponseEntity<?> createOrder(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @RequestBody Map<String, Long> body) {
@@ -57,6 +58,7 @@ public class PaymentController {
      * Body: { "razorpayOrderId", "razorpayPaymentId", "razorpaySignature" }
      */
     @PostMapping("/verify")
+    @com.mishraachandan.booking_system.config.idempotency.Idempotent
     public ResponseEntity<?> verifyPayment(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @RequestBody Map<String, String> body) {

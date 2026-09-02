@@ -64,6 +64,13 @@ dependencies {
 	implementation 'com.google.zxing:javase:3.5.3'
 	// OpenCSV
 	implementation 'com.opencsv:opencsv:5.9'
+	// Spring AOP
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+	// Flyway Database Migrations
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+	// Resilience4j Circuit Breaker & Retry
+	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
 }
 
 tasks.named('test') {

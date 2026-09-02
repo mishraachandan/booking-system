@@ -24,6 +24,8 @@ public class EmailService {
      * If SMTP is not configured, the exception is caught and logged — registration still succeeds.
      */
     @Async
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "emailService", fallbackMethod = "sendOtpEmailFallback")
+    @io.github.resilience4j.retry.annotation.Retry(name = "emailService")
     public void sendOtpEmail(String to, String otp) {
         log.info("Sending OTP to email: {}", to);
         try {
@@ -43,13 +45,20 @@ public class EmailService {
         } catch (Exception e) {
             // Log OTP to console so developer can verify accounts without real email during dev
             log.warn("Email send failed for {} — OTP is: {} (check logs for manual verification)", to, otp);
+            throw e; // Rethrow to allow circuit breaker and retry to track failures
         }
+    }
+
+    public void sendOtpEmailFallback(String to, String otp, Throwable t) {
+        log.warn("CircuitBreaker [emailService] tripped or retries exhausted for sendOtpEmail to {}. OTP is: {}", to, otp);
     }
 
     /**
      * Sends booking confirmation email asynchronously.
      */
     @Async
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "emailService", fallbackMethod = "sendBookingConfirmationEmailFallback")
+    @io.github.resilience4j.retry.annotation.Retry(name = "emailService")
     public void sendBookingConfirmationEmail(String to, Long bookingId, String movieTitle, String resourceName,
                                              List<String> seats, java.math.BigDecimal amount) {
         log.info("Sending booking confirmation email to: {}", to);
@@ -81,13 +90,21 @@ public class EmailService {
             log.info("Booking confirmation email sent successfully to {}", to);
         } catch (Exception e) {
             log.warn("Booking confirmation email send failed for {} — Booking ID: {}", to, bookingId, e);
+            throw e;
         }
+    }
+
+    public void sendBookingConfirmationEmailFallback(String to, Long bookingId, String movieTitle, String resourceName,
+                                                     List<String> seats, java.math.BigDecimal amount, Throwable t) {
+        log.warn("CircuitBreaker [emailService] tripped for booking confirmation #{} to {}: {}", bookingId, to, t.getMessage());
     }
 
     /**
      * Sends booking expired/cancelled email asynchronously.
      */
     @Async
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "emailService", fallbackMethod = "sendBookingExpiredEmailFallback")
+    @io.github.resilience4j.retry.annotation.Retry(name = "emailService")
     public void sendBookingExpiredEmail(String to, Long bookingId) {
         log.info("Sending booking expired notification email to: {}", to);
         try {
@@ -105,6 +122,11 @@ public class EmailService {
             log.info("Booking expired email sent successfully to {}", to);
         } catch (Exception e) {
             log.warn("Booking expired email send failed for {} — Booking ID: {}", to, bookingId, e);
+            throw e;
         }
+    }
+
+    public void sendBookingExpiredEmailFallback(String to, Long bookingId, Throwable t) {
+        log.warn("CircuitBreaker [emailService] tripped for booking expired notice #{} to {}: {}", bookingId, to, t.getMessage());
     }
 }

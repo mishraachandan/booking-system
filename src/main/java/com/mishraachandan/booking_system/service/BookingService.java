@@ -50,6 +50,7 @@ public class BookingService {
     private final BookingAddOnRepository bookingAddOnRepository;
     private final PricingService pricingService;
     private final BookingEventProducer bookingEventProducer;
+    private final OutboxEventService outboxEventService;
     private final com.mishraachandan.booking_system.config.SeatWebSocketHandler seatWebSocketHandler;
 
     public BookingService(BookingRepository bookingRepository,
@@ -61,6 +62,7 @@ public class BookingService {
             BookingAddOnRepository bookingAddOnRepository,
             PricingService pricingService,
             BookingEventProducer bookingEventProducer,
+            OutboxEventService outboxEventService,
             com.mishraachandan.booking_system.config.SeatWebSocketHandler seatWebSocketHandler) {
         this.bookingRepository = bookingRepository;
         this.resourceRepository = resourceRepository;
@@ -71,6 +73,7 @@ public class BookingService {
         this.bookingAddOnRepository = bookingAddOnRepository;
         this.pricingService = pricingService;
         this.bookingEventProducer = bookingEventProducer;
+        this.outboxEventService = outboxEventService;
         this.seatWebSocketHandler = seatWebSocketHandler;
     }
 
@@ -220,7 +223,7 @@ public class BookingService {
                 savedBooking.getId(), userId, showSeats.size(), request.getShowId(), totalPrice, addOnTotal);
 
         initializeBookingProxies(savedBooking);
-        bookingEventProducer.publishEvent(savedBooking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CREATED);
+        outboxEventService.recordBookingEvent(savedBooking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CREATED);
         return savedBooking;
     }
 
@@ -274,7 +277,7 @@ public class BookingService {
         logger.info("Booking {} confirmed", bookingId);
         
         initializeBookingProxies(confirmed);
-        bookingEventProducer.publishEvent(confirmed, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CONFIRMED);
+        outboxEventService.recordBookingEvent(confirmed, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CONFIRMED);
         return confirmed;
     }
 
@@ -338,7 +341,7 @@ public class BookingService {
             booking.setStatus(BookingStatus.EXPIRED);
             bookingRepository.save(booking);
             logger.info("Booking {} expired and seats released", booking.getId());
-            bookingEventProducer.publishEvent(booking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.EXPIRED);
+            outboxEventService.recordBookingEvent(booking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.EXPIRED);
         }
     }
 
@@ -431,7 +434,7 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
         logger.info("Booking {} cancelled by user {}", bookingId, userId);
-        bookingEventProducer.publishEvent(booking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CANCELLED);
+        outboxEventService.recordBookingEvent(booking, com.mishraachandan.booking_system.dto.pojo.BookingEvent.EventType.CANCELLED);
     }
 
     /**

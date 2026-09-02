@@ -34,6 +34,7 @@ public class BookingController {
      * userId is extracted from the JWT via @AuthenticationPrincipal.
      */
     @PostMapping
+    @com.mishraachandan.booking_system.config.idempotency.Idempotent
     public ResponseEntity<BookingResponse> placeBooking(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @Valid @RequestBody BookingRequest request) {
@@ -47,6 +48,7 @@ public class BookingController {
      * Seats must be locked first via /api/v1/shows/{showId}/seats/lock.
      */
     @PostMapping("/show-seats")
+    @com.mishraachandan.booking_system.config.idempotency.Idempotent
     public ResponseEntity<BookingResponse> bookShowSeats(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @Valid @RequestBody ShowSeatBookingRequest request) {
@@ -62,6 +64,7 @@ public class BookingController {
      * the underlying booking state change.
      */
     @PostMapping("/{bookingId}/confirm")
+    @com.mishraachandan.booking_system.config.idempotency.Idempotent
     public ResponseEntity<BookingResponse> confirmBooking(
             @PathVariable Long bookingId,
             @AuthenticationPrincipal AuthenticatedUser principal) {

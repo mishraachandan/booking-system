@@ -32,18 +32,31 @@ export class PaymentService {
 
   constructor(private http: HttpClient) {}
 
+  private generateIdempotencyKey(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'idemp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+  }
+
   /**
    * Step 1: Create a Razorpay order for the booking.
    */
-  createOrder(bookingId: number): Observable<CreateOrderResponse> {
-    return this.http.post<CreateOrderResponse>(`${this.baseUrl}/create-order`, { bookingId });
+  createOrder(bookingId: number, idempotencyKey?: string): Observable<CreateOrderResponse> {
+    const key = idempotencyKey || this.generateIdempotencyKey();
+    return this.http.post<CreateOrderResponse>(`${this.baseUrl}/create-order`, { bookingId }, {
+      headers: { 'Idempotency-Key': key }
+    });
   }
 
   /**
    * Step 2: Verify the Razorpay payment signature and confirm the booking.
    */
-  verifyPayment(data: VerifyPaymentRequest): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/verify`, data);
+  verifyPayment(data: VerifyPaymentRequest, idempotencyKey?: string): Observable<any> {
+    const key = idempotencyKey || this.generateIdempotencyKey();
+    return this.http.post<any>(`${this.baseUrl}/verify`, data, {
+      headers: { 'Idempotency-Key': key }
+    });
   }
 
   /**
